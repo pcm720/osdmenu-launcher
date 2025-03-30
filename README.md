@@ -1,3 +1,7 @@
+## Latest Release includes the full SAS packaages ready to use by themselves or with exploits featuring autoboot elf settings.
+**I'l be off computer soon, I've been glued to getting this adapted.**
+
+## ORIGINAL README:
 # OSDSYS Menu Launcher
 
 This is an attempt at porting Free McBoot 1.8 OSDSYS patches to modern PS2SDK.  
