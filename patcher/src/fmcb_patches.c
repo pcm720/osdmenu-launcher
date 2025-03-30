@@ -621,8 +621,6 @@ void patchSkipHDD(uint8_t *osd) {
 
 // Applies patches and executes OSDSYS
 void patchExecuteOSDSYS(void *epc, void *gp) {
-  // while (1) {
-  // }
   int n = 0;
   char *args[5], *ptr;
 

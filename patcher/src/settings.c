@@ -10,8 +10,6 @@
 // leading to leave unsufficient space for big cnf files since OSDSYS needs to load at 0x00100000
 #define DUMMY_MALLOC
 
-#define MAX_PATH 260
-
 char *pCNF = NULL;
 PatcherSettings settings;
 
@@ -75,6 +73,8 @@ nextLine:
 int loadConfig(void) {
   if (settings.mcSlot == 1)
     cnfPath[2] = '1';
+  else
+    cnfPath[2] = '0';
 
   int fd = fioOpen(cnfPath, FIO_O_RDONLY);
   if (fd < 0) {

@@ -238,7 +238,8 @@ char *getMechaConRevision() {
         mechaconRev[4] = '\0';
 
       outBuffer[2] &= 0xFE;
-    }
+    } else
+      mechaconRev[4] = '\0';
 
     mechaconRev[0] = outBuffer[1] + '0';
     mechaconRev[2] = '0' + (outBuffer[2] / 10);

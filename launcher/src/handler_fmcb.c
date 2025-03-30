@@ -61,6 +61,9 @@ int handleFMCB(int argc, char *argv[]) {
   if (res)
     return res;
 
+  if (cnfPath[2] == '?')
+    cnfPath[2] = '0';
+
   // Get memory card slot from argv[0] (fmcb0/1)
   if (!strncmp("mc0", cnfPath, 3) && (argv[0][4] == '1')) {
     // If path is fmcb1:, try to get config from mc1 first
