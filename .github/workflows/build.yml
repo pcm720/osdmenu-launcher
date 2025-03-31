@@ -35,7 +35,7 @@ jobs:
     needs: [build]
     runs-on: ubuntu-latest
     permissions: write-all
-    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/UMCS'
     steps:
     - uses: actions/checkout@v4
 
@@ -57,7 +57,7 @@ jobs:
         zip -r ../osdmenu-launcher-${{ env.GIT_VERSION }}.zip ./*
 
     - uses: "marvinpinto/action-automatic-releases@latest"
-      if: github.ref == 'refs/heads/main'
+      if: github.ref == 'refs/heads/UMCS'
       with:
         repo_token: "${{ secrets.GITHUB_TOKEN }}"
         automatic_release_tag: "nightly"
