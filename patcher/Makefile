@@ -32,6 +32,16 @@ ifeq ($(ENABLE_SPLASH), 1)
  EE_LIBS += -ldma
 endif
 
+ifdef CONF_PATH
+ EE_CFLAGS += -DCONF_PATH=\"$(CONF_PATH)\"
+endif
+ifdef LAUNCHER_PATH
+ EE_CFLAGS += -DLAUNCHER_PATH=\"$(LAUNCHER_PATH)\"
+endif
+ifdef DKWDRV_PATH
+ EE_CFLAGS += -DDKWDRV_PATH=\"$(DKWDRV_PATH)\"
+endif
+
 EE_OBJS_DIR = obj/
 EE_ASM_DIR = asm/
 EE_SRC_DIR = src/
