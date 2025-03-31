@@ -31,9 +31,18 @@ IRX_FILES += xparam.irx
 ELF_FILES += loader.elf
 RES_FILES += icon_A.sys icon_C.sys icon_J.sys
 
-
 # C compiler flags
 EE_CFLAGS := -D_EE -O2 -G0 -Wall $(EE_CFLAGS)
+
+ifdef CONF_PATH
+ EE_CFLAGS += -DCONF_PATH=\"$(CONF_PATH)\"
+endif
+ifdef LAUNCHER_PATH
+ EE_CFLAGS += -DLAUNCHER_PATH=\"$(LAUNCHER_PATH)\"
+endif
+ifdef DKWDRV_PATH
+ EE_CFLAGS += -DDKWDRV_PATH=\"$(DKWDRV_PATH)\"
+endif
 
 EE_OBJS_DIR = obj/
 EE_ASM_DIR = asm/
