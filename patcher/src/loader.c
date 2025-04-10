@@ -1,5 +1,6 @@
 #include "fmcb_patches.h"
 #include "init.h"
+#include "osdmenu_patches.h"
 #include "settings.h"
 #include "splash.h"
 #include <kernel.h>
@@ -14,6 +15,8 @@ void launchItem(char *item) {
     // Do nothing
     return;
   }
+
+  restoreGSVideoMode();
 
   DisableIntc(3);
   DisableIntc(2);

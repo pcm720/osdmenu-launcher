@@ -37,11 +37,28 @@ static uint32_t patternGsGetGParam[] = {
 };
 static uint32_t patternGsGetGParam_mask[] = {0xfc000000, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff};
 
+// Pattern for overriding the sceGsPutDispEnv function call in sceGsSwapDBuff
+static uint32_t patternGsPutDispEnv[] = {
+    // Searching for particular pattern in sceGsSwapDBuff
+    0x0c000000, // jal sceGsPutDispEnv
+    0x00512021, // addu a0,v0,s1
+    0x12000005, // beq s0,zero,0x05
+    0x00000000, // nop
+    0x0c000000, // jal sceGsPutDrawEnv
+    0x26240140, // addiu a0,s1,0x0140
+    0x10000004, // beq zero,zero,0x04
+    0xdfbf0020, // ld ra,0x0020,sp
+};
+static uint32_t patternGsPutDispEnv_mask[] = {
+    0xfc000000, 0xffffffff, 0xffffffff, 0xffffffff, //
+    0xfc000000, 0xffffffff, 0xffffffff, 0xffffffff, //
+};
+
 // Pattern for getting the address of sceCdApplySCmd function
 // After finding this pattern, go back until reaching
 // _lw(addr) & 0xffff0000 == 0x27bd0000 (addiu $sp,$sp, ?) to get the function address.
 static uint32_t patternCdApplySCmd[] = {
-    //  0x27bd0000, // addiu $sp, $sp, ??
+    //  0x27bd0000, // addiu $sp,$sp,??
     //  ~15-20 instructions
     0x0c000000, //     jal WaitSema
     0x00000000, //     ...

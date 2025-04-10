@@ -10,7 +10,7 @@
 #include <string.h>
 
 typedef struct {
-  uint16_t mode;
+  GSVideoMode mode;
   uint16_t width;
   uint16_t height;
   uint16_t psm;
@@ -19,8 +19,8 @@ typedef struct {
 } vmode_t;
 
 vmode_t vmodes[] = {
-    {3, 640, 512, 0, 32, 4}, // PAL
-    {2, 640, 448, 0, 32, 4}  // NTSC
+    {GS_MODE_PAL, 640, 512, 0, 32, 4}, // PAL
+    {GS_MODE_NTSC, 640, 448, 0, 32, 4}  // NTSC
 };
 vmode_t *selectedMode;
 
@@ -34,7 +34,7 @@ void gsPrintBitmap(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint32_t *dat
 
 // Initializes GS and displays FMCB splash screen
 void gsDisplaySplash(GSVideoMode mode) {
-  int splashY = (mode == PAL_640_512_32) ? 247 : 185;
+  int splashY = (mode == GS_MODE_PAL) ? 247 : 185;
 
   selectedMode = &(vmodes[mode]);
   gsInit(selectedMode);
@@ -52,7 +52,7 @@ int gsInit(vmode_t *mode) {
   // Reset DMA
   dma_reset();
   // Reset GS
-  *(volatile uint64_t *)REG_CSR = 0x200;
+  *(volatile uint64_t *)GS_REG_CSR = 0x200;
   // Mask interrupts
   GsPutIMR(0xff00);
   // Configure GS CRT
@@ -86,16 +86,16 @@ int gsInit(vmode_t *mode) {
   BEGIN_GS_PACKET(gsDMABuf);
 
   GIF_TAG_AD(gsDMABuf, 3, 1, 0, 0, 0);
-  GIF_DATA_AD(gsDMABuf, REG_FRAME_1,
+  GIF_DATA_AD(gsDMABuf, GS_REG_FRAME_1,
               GS_FRAME(0,                // FrameBuffer base pointer = 0 (Address/2048)
                        mode->width / 64, // Frame buffer width (Pixels/64)
                        mode->psm,        // Pixel Storage Format
                        0));
 
   // No displacement between Primitive and Window coordinate systems.
-  GIF_DATA_AD(gsDMABuf, REG_XYOFFSET_1, GS_XYOFFSET(0x0, 0x0));
+  GIF_DATA_AD(gsDMABuf, GS_REG_XYOFFSET_1, GS_XYOFFSET(0x0, 0x0));
   // Clip to frame buffer.
-  GIF_DATA_AD(gsDMABuf, REG_SCISSOR_1, GS_SCISSOR(0, gsMaxX, 0, gsMaxY));
+  GIF_DATA_AD(gsDMABuf, GS_REG_SCISSOR_1, GS_SCISSOR(0, gsMaxX, 0, gsMaxY));
 
   SEND_GS_PACKET(gsDMABuf);
 
@@ -109,10 +109,10 @@ void gsClearScreen() {
   BEGIN_GS_PACKET(gsDMABuf);
 
   GIF_TAG_AD(gsDMABuf, 4, 1, 0, 0, 0);
-  GIF_DATA_AD(gsDMABuf, REG_PRIM, GS_PRIM(PRIM_SPRITE, 0, 0, 0, 0, 0, 0, 0, 0));
-  GIF_DATA_AD(gsDMABuf, REG_RGBAQ, GS_RGBAQ(0, 0, 0, 0, 0));
-  GIF_DATA_AD(gsDMABuf, REG_XYZ2, GS_XYZ2(0, 0, 0));
-  GIF_DATA_AD(gsDMABuf, REG_XYZ2, GS_XYZ2((gsMaxX + 1) << 4, (gsMaxY + 1) << 4, 0));
+  GIF_DATA_AD(gsDMABuf, GS_REG_PRIM, GS_PRIM(PRIM_SPRITE, 0, 0, 0, 0, 0, 0, 0, 0));
+  GIF_DATA_AD(gsDMABuf, GS_REG_RGBAQ, GS_RGBAQ(0, 0, 0, 0, 0));
+  GIF_DATA_AD(gsDMABuf, GS_REG_XYZ2, GS_XYZ2(0, 0, 0));
+  GIF_DATA_AD(gsDMABuf, GS_REG_XYZ2, GS_XYZ2((gsMaxX + 1) << 4, (gsMaxY + 1) << 4, 0));
 
   SEND_GS_PACKET(gsDMABuf);
 }
@@ -128,14 +128,14 @@ void gsPrintBitmap(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint32_t *dat
 
   BEGIN_GS_PACKET(gsDMABuf);
   GIF_TAG_AD(gsDMABuf, 4, 1, 0, 0, 0);
-  GIF_DATA_AD(gsDMABuf, REG_BITBLTBUF,
+  GIF_DATA_AD(gsDMABuf, GS_REG_BITBLTBUF,
               GS_BITBLTBUF(0, 0, 0,
                            0,                 // frame buffer address
                            (gsMaxX + 1) / 64, // frame buffer width
                            0));
-  GIF_DATA_AD(gsDMABuf, REG_TRXPOS, GS_TRXPOS(0, 0, x, y, 0)); // left to right/top to bottom
-  GIF_DATA_AD(gsDMABuf, REG_TRXREG, GS_TRXREG(w, h));
-  GIF_DATA_AD(gsDMABuf, REG_TRXDIR, GS_TRXDIR(XDIR_EE_GS));
+  GIF_DATA_AD(gsDMABuf, GS_REG_TRXPOS, GS_TRXPOS(0, 0, x, y, 0)); // left to right/top to bottom
+  GIF_DATA_AD(gsDMABuf, GS_REG_TRXREG, GS_TRXREG(w, h));
+  GIF_DATA_AD(gsDMABuf, GS_REG_TRXDIR, GS_TRXDIR(XDIR_EE_GS));
   SEND_GS_PACKET(gsDMABuf);
 
   qtotal = w * h / 4;              // total number of quadwords to transfer.

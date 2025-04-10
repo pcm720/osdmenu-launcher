@@ -3,10 +3,22 @@
 #include "osdmenu_patterns.h"
 #include "settings.h"
 #include <debug.h>
+#include <gs.h>
 #include <kernel.h>
-#include <libgs.h>
 #include <stdint.h>
 #include <string.h>
+
+typedef struct {
+  uint16_t sceGsInterMode; // Interlace/non-interlace value
+  uint16_t sceGsOutMode;   // NTSC/PAL value
+  uint16_t sceGsFFMode;    // FIELD/FRAME value
+  uint16_t sceGsVersion;   // GS version
+} sceGsGParam;
+
+// Returns a pointer to sceGsGParam
+// Can't use PS2SDK libgs function because these parameters
+// are set by OSDSYS at an unknown address when setting the video mode
+static sceGsGParam *(*sceGsGetGParam)(void) = NULL;
 
 //
 // Version info menu patch
@@ -17,16 +29,6 @@ static char romverValue[] = "\ar0.80VVVVRTYYYYMMDD\ar0.00";
 static char mechaconRev[] = "0.00 (Debug)";
 static char eeRevision[5] = {0};
 static char gsRevision[5] = {0};
-
-// Returns a pointer to GParam array
-// GParam values:
-// 0 — Interlaced/non-interlaced mode
-// 1 — Video mode (PAL/NTSC)
-// 2 — Field mode (Field/Frame)
-// 3 — GS Revision
-// Can't use PS2SDK libgs function because these parameters
-// are set by OSDSYS at an unknown address when setting the video mode
-static uint16_t *(*sceGsGetGParam)(void) = NULL;
 
 static uint16_t *(*sceCdApplySCmd)(uint16_t cmdNum, const void *inBuff, uint16_t inBuffSize, void *outBuff) = NULL;
 
@@ -190,14 +192,16 @@ char *getVideoMode() {
   if (!sceGsGetGParam)
     return NULL;
 
-  uint16_t *gParam = sceGsGetGParam();
-  switch (gParam[1]) {
+  sceGsGParam *gParam = sceGsGetGParam();
+  switch (gParam->sceGsOutMode) {
   case GS_MODE_PAL:
     return "PAL";
   case GS_MODE_NTSC:
     return "NTSC";
   case GS_MODE_DTV_480P:
     return "480p";
+  case GS_MODE_DTV_1080I:
+    return "1080i";
   }
 
   return "-";
@@ -207,9 +211,9 @@ char *getGSRevision() {
   if (!sceGsGetGParam)
     return NULL;
 
-  uint16_t *gParam = sceGsGetGParam();
-  if (gParam[3]) {
-    formatRevision(gsRevision, gParam[3]);
+  sceGsGParam *gParam = sceGsGetGParam();
+  if (gParam->sceGsVersion) {
+    formatRevision(gsRevision, gParam->sceGsVersion);
     return gsRevision;
   }
 
@@ -250,4 +254,112 @@ char *getMechaConRevision() {
   // Failed to get the revision
   mechaconRev[0] = '\0';
   return NULL;
+}
+
+//
+// 480p/1080i patch.
+// Partially based on Neutrino GSM
+//
+
+// Struct passed to sceGsPutDispEnv
+typedef struct {
+  uint64_t pmode;
+  uint64_t smode2;
+  uint64_t dispfb;
+  uint64_t display;
+  uint64_t bgcolor;
+} sceGsDispEnv;
+
+static void (*origSetGsCrt)(short int interlace, short int mode, short int ffmd) = NULL;
+static GSVideoMode selectedMode = 0;
+
+// Using dedicated functions instead of switching on selectedMode because SetGsCrt is executed in kernel mode
+static void setGsCrt480p(short int interlace, short int mode, short int ffmd) {
+  // Override out mode
+  origSetGsCrt(0, GS_MODE_DTV_480P, ffmd);
+  return;
+}
+static void setGsCrt1080i(short int interlace, short int mode, short int ffmd) {
+  // Override out mode
+  origSetGsCrt(1, GS_MODE_DTV_1080I, ffmd);
+  return;
+}
+
+// sceGsPutDispEnv function replacement
+void gsPutDispEnv(sceGsDispEnv *disp) {
+  if (sceGsGetGParam) {
+    // Modify gsGsGParam (needed to show the proper mode in the Version submenu, completely cosmetical)
+    sceGsGParam *gParam = sceGsGetGParam();
+    switch (selectedMode) {
+    case GS_MODE_DTV_480P:
+      gParam->sceGsInterMode = 0;
+    case GS_MODE_DTV_1080I:
+      gParam->sceGsOutMode = selectedMode;
+    default:
+    }
+  }
+  // Override writes to SMODE2/DISPLAY2 registers
+  switch (selectedMode) {
+  case GS_MODE_DTV_480P:
+    GS_SET_SMODE2(0, 1, 0);
+    GS_SET_DISPLAY2(318, 50, 1, 1, 1279, 447);
+    break;
+  case GS_MODE_DTV_1080I:
+    *GS_REG_SMODE2 = disp->smode2;
+    GS_SET_DISPLAY2(558, 130, 1, 1, 1279, 895);
+    break;
+  default:
+    *GS_REG_SMODE2 = disp->smode2;
+    *GS_REG_DISPLAY2 = disp->display;
+  }
+
+  *GS_REG_PMODE = disp->pmode;
+  *GS_REG_DISPFB2 = disp->dispfb;
+  *GS_REG_BGCOLOR = disp->bgcolor;
+}
+
+// Overrides SetGsCrt and sceGsPutDispEnv functions to support 480p and 1080i output modes
+// ALWAYS call restoreGSVideoMode before launching apps
+void patchGSVideoMode(uint8_t *osd, GSVideoMode outputMode) {
+  if (outputMode < GS_MODE_DTV_480P)
+    return; // Do not apply patch for PAL/NTSC modes
+
+  // Find sceGsPutDispEnv address
+  uint8_t *ptr =
+      findPatternWithMask(osd, 0x00100000, (uint8_t *)patternGsPutDispEnv, (uint8_t *)patternGsPutDispEnv_mask, sizeof(patternGsPutDispEnv));
+  if (!ptr)
+    return;
+
+  // Get the address of the original SetGsCrt handler and translate it to kernel mode address range used by syscalls (kseg0)
+  origSetGsCrt = (void *)(((uint32_t)GetSyscallHandler(0x2) & 0x0fffffff) | 0x80000000);
+  if (!origSetGsCrt)
+    return;
+
+  // Replace call to sceGsPutDispEnv with the custom function
+  uint32_t tmp = 0x0c000000;
+  tmp |= ((uint32_t)gsPutDispEnv >> 2);
+  _sw(tmp, (uint32_t)ptr); // jal gsPutDispEnv
+
+  // Replace SetGsCrt with custom handler
+  switch (outputMode) {
+  case GS_MODE_DTV_480P:
+    selectedMode = outputMode;
+    SetSyscall(0x2, (void *)(((uint32_t)(setGsCrt480p) & ~0xE0000000) | 0x80000000));
+    break;
+  case GS_MODE_DTV_1080I:
+    selectedMode = outputMode;
+    SetSyscall(0x2, (void *)(((uint32_t)(setGsCrt1080i) & ~0xE0000000) | 0x80000000));
+    break;
+  default:
+  }
+}
+
+// Restores SetGsCrt.
+// Can be safely called even if GS video mode patch wasn't applied
+void restoreGSVideoMode() {
+  if (!origSetGsCrt)
+    return;
+
+  // Restore the original syscall handler
+  SetSyscall(0x2, origSetGsCrt);
 }

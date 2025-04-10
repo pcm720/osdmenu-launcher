@@ -21,6 +21,7 @@ Will not work on "protokernel" systems (SCPH-10000, SCPH-15000) and possibly SCP
 - A separate launcher is used to launch menu entries
 - CD/DVD support was extended to support skipping PS2LOGO, mounting VMCs on MMCE devices, showing visual GameID for PixelFX devices and booting DKWDRV for PS1 discs
 - "Unlimited" number of paths for each entry
+- Support for 1080i and 480p (as line-doubled 240p) video modes
 
 Due to memory limitations and the need to support more devices, the original FMCB launcher was split into two parts: patcher and launcher.
 
@@ -32,7 +33,7 @@ It reads settings from `mc?:/SYS-CONF/OSDMENU.CNF` and patches the `rom0:OSDSYS`
 - Infinite scrolling
 - Custom button prompts and menu header
 - Automatic disc launch bypass
-- Force PAL/NTSC video mode
+- Force GS video mode PAL, NTSC, 1080i or line-doubled 480p. Due to how to OSDSYS renders everything, "true" 480p can't be implemented easily
 - HDD update check bypass
 - Override PS1 and PS2 disc launch functions with custom code that starts the launcher
 - Additional system information in version submenu (Video mode, ROM version, EE, GS and MechaCon revision)
@@ -100,7 +101,7 @@ arg=-testarg2
 
 Most of `OSDMENU.CNF` settings are directly compatible with those from FMCB 1.8 `FREEMCB.CNF`.
 
-1. `OSDSYS_video_mode` — force OSDSYS mode. Valid values are `AUTO`, `PAL` or `NTSC`
+1. `OSDSYS_video_mode` — force OSDSYS mode. Valid values are `AUTO`, `PAL`, `NTSC`, `480p` or `1080i`
 2. `hacked_OSDSYS` — enables or disables OSDSYS patches
 3. `OSDSYS_scroll_menu` — enables or disables infinite scrolling
 4. `OSDSYS_menu_x` — menu X center coordinate
@@ -138,6 +139,6 @@ New to this launcher:
 - Everyone involved in developing the original Free MC Boot and OSDSYS patches, especially Neme and jimmikaelkael
 - [TonyHax International](https://github.com/alex-free/tonyhax) developers for PS1 game ID detection for generic executables.
 - Maximus32 for creating the [`smap_udpbd` module](
-https://github.com/rickgaiser/neutrino)
+https://github.com/rickgaiser/neutrino) and Neutrino GSM
 - Matías Israelson for making [PS2BBL](https://github.com/israpps/PlayStation2-Basic-BootLoader)
 - CosmicScale for [RetroGEM Disc Launcher](https://github.com/CosmicScale/Retro-GEM-PS2-Disc-Launcher)

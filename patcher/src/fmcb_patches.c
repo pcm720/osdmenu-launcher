@@ -598,10 +598,17 @@ void patchVideoMode(uint8_t *osd) {
   if (!ptr)
     return;
 
-  if (!strcmp(settings.videoMode, "NTSC"))     // NTSC:
-    _sw(0x0000102d, (uint32_t)ptr + 20);       // set return value to 0
-  else if (!strcmp(settings.videoMode, "PAL")) // PAL:
-    _sw(0x24020001, (uint32_t)ptr + 20);       // set return value to 1
+  if (!strcmp(settings.videoMode, "NTSC"))           // NTSC:
+    _sw(0x0000102d, (uint32_t)ptr + 20);             // set return value to 0
+  else if (!strcmp(settings.videoMode, "PAL"))       // PAL:
+    _sw(0x24020001, (uint32_t)ptr + 20);             // set return value to 1
+  else if (!strcmp(settings.videoMode, "480p")) {    // 480p:
+    _sw(0x0000102d, (uint32_t)ptr + 20);             // set return value to 0 to force NTSC
+    patchGSVideoMode(osd, GS_MODE_DTV_480P);         // apply 480p patch
+  } else if (!strcmp(settings.videoMode, "1080i")) { // 1080i:
+    _sw(0x0000102d, (uint32_t)ptr + 20);             // set return value to 0 to force NTSC
+    patchGSVideoMode(osd, GS_MODE_DTV_1080I);        // apply 1080i patch
+  }
 }
 
 // Patches HDD update code for ROMs not supporting "SkipHdd" arg

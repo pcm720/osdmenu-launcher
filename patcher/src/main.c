@@ -1,4 +1,5 @@
 #include "fmcb_patches.h"
+#include "gs.h"
 #include "init.h"
 #include "settings.h"
 #include "splash.h"
@@ -65,15 +66,15 @@ int main(int argc, char *argv[]) {
     Exit(-1);
 
 #ifdef ENABLE_SPLASH
-  GSVideoMode vmode = NTSC_640_448_32; // Use NTSC by default
+  GSVideoMode vmode = GS_MODE_NTSC; // Use NTSC by default
 
   // Respect preferred mode
   if (!strcmp(settings.videoMode, "AUTO")) {
     // If mode is not set, read console region from ROM
     if (settings.romver[4] == 'E')
-      vmode = PAL_640_512_32;
+      vmode = GS_MODE_PAL;
   } else if (!strcmp(settings.videoMode, "PAL"))
-    vmode = PAL_640_512_32;
+    vmode = GS_MODE_PAL;
 
   gsDisplaySplash(vmode);
 #endif
