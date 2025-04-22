@@ -79,13 +79,7 @@ int main(int argc, char *argv[]) {
   gsDisplaySplash(vmode);
 #endif
 
-  int fd = fioOpen("rom0:MBROWS", FIO_O_RDONLY);
-  if (fd >= 0) {
-    // MBROWS exists only on protokernel systems
-    fioClose(fd);
-    launchProtokernelOSDSYS();
-  } else
-    launchOSDSYS();
+  launchOSDSYS();
 
   Exit(-1);
 }

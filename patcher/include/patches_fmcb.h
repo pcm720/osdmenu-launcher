@@ -19,25 +19,12 @@ void patchDiscLaunch(uint8_t *osd);
 void patchSkipDisc(uint8_t *osd);
 
 // Patches menu scrolling
-void patchMenuInfiniteScrolling(uint8_t *osd, int isProtokernel);
+void patchMenuInfiniteScrolling(uint8_t *osd);
 
 // Forces the video mode
 void patchVideoMode(uint8_t *osd, GSVideoMode mode);
 
 // Patches HDD update code for ROMs not supporting "SkipHdd" arg
 void patchSkipHDD(uint8_t *osd);
-
-//
-// Protokernel patches
-//
-
-// Patches OSD menu to include custom menu entries
-void patchMenuProtokernel(uint8_t *osd);
-
-// Patches menu drawing functions
-void patchMenuDrawProtokernel(uint8_t *osd);
-
-// Patches the disc launch handlers to load discs with the launcher
-void patchDiscLaunchProtokernel(uint8_t *osd);
 
 #endif

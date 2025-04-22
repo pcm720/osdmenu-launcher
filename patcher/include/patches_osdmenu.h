@@ -16,14 +16,6 @@ void patchGSVideoMode(uint8_t *osd, GSVideoMode outputMode);
 void restoreGSVideoMode();
 
 // Browser application launch patch
-void patchBrowserApplicationLaunch(uint8_t *osd, int isProtokernel);
-
-// Protokernel patches
-
-// Extends version menu with custom entries
-void patchVersionInfoProtokernel(uint8_t *osd);
-
-// Overrides SetGsCrt and sceGsPutDispEnv functions to support 480p and 1080i output modes
-void patchGSVideoModeProtokernel(uint8_t *osd, GSVideoMode outputMode);
+void patchBrowserApplicationLaunch(uint8_t *osd);
 
 #endif

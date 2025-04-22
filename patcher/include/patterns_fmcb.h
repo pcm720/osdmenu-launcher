@@ -121,21 +121,6 @@ static uint32_t patternExecuteDisc[] = {
 };
 static uint32_t patternExecuteDisc_mask[] = {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, //
                                              0xffffff00, 0x00000000, 0xffffffff, 0xffffffff, 0xffffff00, 0xffff0000};
-static uint32_t patternExecuteDiscProto[] = {
-    // ExecuteDisc function on protokernel
-    0x27bdfff0, //    addiu	sp, sp, $fff0
-    0x8c430000, //    lw	v1, $XXXX(v0)
-    0xffbf0000, //    sd	ra, $0000(sp)
-    0x8c640000, //    lw	a0, $XXXX(v1)
-    0x24830002, //    addiu	v1, a0, 2
-    0x2c620006, //    sltiu	v0, v1, 6
-    0x10400000, //    beq	v0, zero, quit
-    0x3c020000, //    lui	v0, xxxx
-    0x00031880, //	  sll	v1, v1, 2
-    0x24420000  //    addiu	v0, v0, xxxx
-};
-static uint32_t patternExecuteDiscProto_mask[] = {0xffffffff, 0xffff0000, 0xffffffff, 0xffff0000, 0xffffffff, //
-                                                  0xffffffff, 0xffff0000, 0xffff0000, 0xffffffff, 0xffff0000};
 
 // Patterns for patching the disc detection to bypass automatic disc launch
 static uint32_t patternDetectDisc_1[] = {
@@ -191,53 +176,5 @@ static uint32_t patternHDDLoad[] = {
     0x04400000  // bltz  v0, Exit_HddLoad
 };
 static uint32_t patternHDDLoad_mask[] = {0xfc000000, 0xffffffff, 0xffffffff, 0xffffffff, 0xffff0000, 0xfc000000, 0xffffffff, 0xffff0000};
-
-//
-// The following patterns are introduced in FMCB 1.9 and found by reverse-engineering the FMCB 1.9 code
-//
-
-// Pattern for patching the draw functions for selected/unselected items
-static uint32_t patternDrawMenuItem_Proto[] = {
-    0x240401ae, // addiu a0,zero,0x01AE
-    0x0220282d, // daddu a1,s1,zero
-    0x24060000, // addiu a2,zero,0x0000
-    0x01124021, // addu  t0,t0,s2
-    0x0c180f26, // jal   DrawNonSelectableItem
-    0x0280382d, // daddu a3,s4,zero
-};
-static uint32_t patternDrawMenuItem_Proto_mask[] = {0xffffffff, 0xffffffff, 0xfc1f0000, 0xffffffff, 0xffffffff, 0xffffffff};
-
-// Pattern for finding OSD menu info struct
-static uint32_t patternMenuInfo_Proto[] = {
-    0x00000000, // pointer to osdmenu
-    0x00000002, // number of entries
-    0x00000003, // unknown
-    0x00000000, // current selection
-};
-static uint32_t patternMenuInfo_Proto_mask[] = {0xff800000, 0xffffffff, 0xffffffff, 0xffffffff};
-
-// Patterns for patching the draw functions for bottom button prompts
-static uint32_t patternDrawButtonPanel_2_Proto[] = {
-    0x0280302d, // daddu a2,s4,zero
-    0x8e640000, // lw    a0,0x0000,s3
-    0x8e450000, // lw    a1,0x0000,s2
-    0x0c000000, // jal 	 DrawIcon
-    0x02a0382d, // daddu a3,s5,zero
-};
-static uint32_t patternDrawButtonPanel_2_Proto_mask[] = {0xffffffff, 0xffffffff, 0xffffffff, 0xfc000000, 0xffffffff};
-
-static uint32_t patternDrawButtonPanel_3_Proto[] = {
-    0x8e440000, // lw    a0,0x0000,s2
-    0x0280282d, // daddu a1,s4,zero
-    0x26e6f480, // addiu a2,s7,0xF480
-    0x02a0382d, // daddu a3,s5,zero
-    0x009e2021, // addu  a0,a0,fp
-    0x0c000000, // jal   DrawNonSelectableItem
-    0x0220402d, // daddu t0,s1,zero
-};
-static uint32_t patternDrawButtonPanel_3_Proto_mask[] = {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xfc000000, 0xffffffff};
-
-// Pattern for patching the menu scrolling behavior. Uses patternMenuLoop_mask.
-static uint32_t patternMenuLoop_Proto[] = {0x30621000, 0x10400007, 0x2604ffe4, 0x8c830014, 0x2462ffff, 0x0441000e, 0xac820014};
 
 #endif

@@ -11,9 +11,6 @@ void launchOSDSYS();
 // Calls OSDSYS deinit function
 void deinitOSDSYS();
 
-// Loads OSDSYS from ROM and injects the patching function into OSDSYS
-void launchProtokernelOSDSYS();
-
 // Searches for byte pattern in memory
 uint8_t *findPatternWithMask(uint8_t *buf, uint32_t bufsize, uint8_t *bytes, uint8_t *mask, uint32_t len);
 

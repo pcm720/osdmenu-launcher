@@ -15,23 +15,6 @@ static uint32_t patternExecPS2[] = {
 };
 static uint32_t patternExecPS2_mask[] = {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff};
 
-//
-// The following patterns are introduced in FMCB 1.9 and found by reverse-engineering FMCB 1.9 code
-//
-
-// Used to inject the patching function into the OSDSYS init on protokernels
-// Inject j <applyPatches> at offset +0x3c
-static uint32_t patternOSDSYSProtokernelInit[] = {
-    0x26940414, // addiu s4,s4,0x0414
-    0x26d60414, // addiu s6,s6,0x0414
-    0x2aa2000c, // slti  v0,s5,0x000C
-    0x14400000, // bne   v0,zero,0x????
-    0x26520414, // addiu s2,s2,0x0414
-};
-static uint32_t patternOSDSYSProtokernelInit_mask[] = {
-    0xffffffff, 0xffffffff, 0xffffffff, 0xffff0000, 0xffffffff,
-};
-
 // Used to deinit OSDSYS
 static uint32_t patternOSDSYSDeinit[] = {
     0x27bdffe0, // addiu sp,sp,0xFFE0

@@ -48,13 +48,13 @@ void patchExecuteOSDSYS(void *epc, void *gp) {
     // If hacked OSDSYS is enabled, apply menu patch
     patchMenu((uint8_t *)epc);
     patchMenuDraw((uint8_t *)epc);
-    patchMenuInfiniteScrolling((uint8_t *)epc, 0);
+    patchMenuInfiniteScrolling((uint8_t *)epc);
     patchMenuButtonPanel((uint8_t *)epc);
   }
 
   // Apply browser application launch patch
   if (settings.patcherFlags & FLAG_BROWSER_LAUNCHER)
-    patchBrowserApplicationLaunch((uint8_t *)epc, 0);
+    patchBrowserApplicationLaunch((uint8_t *)epc);
 
   // Apply version menu patch
   patchVersionInfo((uint8_t *)epc);
@@ -148,82 +148,4 @@ void launchOSDSYS() {
 void deinitOSDSYS() {
   if (osdsysDeinit)
     osdsysDeinit(1);
-}
-
-//
-// Protokernel functions
-//
-
-// Applies patches and executes OSDSYS
-static void *protoEPC;
-void applyProtokernelPatches() {
-  if (settings.patcherFlags & FLAG_CUSTOM_MENU) {
-    // If hacked OSDSYS is enabled, apply menu patch
-    patchMenuProtokernel((uint8_t *)protoEPC);
-    patchMenuDrawProtokernel((uint8_t *)protoEPC);
-    patchMenuInfiniteScrolling((uint8_t *)protoEPC, 1);
-  }
-
-  // Apply browser application launch patch
-  if (settings.patcherFlags & FLAG_BROWSER_LAUNCHER)
-    patchBrowserApplicationLaunch((uint8_t *)protoEPC, 1);
-
-  // Apply version menu patch
-  patchVersionInfoProtokernel((uint8_t *)protoEPC);
-
-  // Patch the video mode if required
-  switch (settings.videoMode) {
-  case GS_MODE_DTV_480P:
-  case GS_MODE_DTV_1080I:
-    patchGSVideoModeProtokernel((uint8_t *)protoEPC, settings.videoMode); // Apply 480p or 1080i patch
-  default:
-  }
-
-  // Apply disc launch patch to forward disc launch to the launcher
-  patchDiscLaunchProtokernel((uint8_t *)protoEPC);
-
-  FlushCache(0);
-  FlushCache(2);
-}
-
-// Loads OSDSYS from ROM and injects the patching function into OSDSYS
-void launchProtokernelOSDSYS() {
-  t_ExecData exec;
-
-  if (SifLoadElf("rom0:OSDSYS", &exec) || (exec.epc < 0))
-    return;
-
-  // Find OSDSYS init function
-  uint8_t *ptr = findPatternWithMask((uint8_t *)exec.epc, 0x100000, (uint8_t *)patternOSDSYSProtokernelInit,
-                                     (uint8_t *)patternOSDSYSProtokernelInit_mask, sizeof(patternOSDSYSProtokernelInit));
-  if (!ptr)
-    return;
-
-  // Inject patching function
-  uint32_t tmp = 0x08000000;
-  tmp |= ((uint32_t)applyProtokernelPatches >> 2);
-  _sw(tmp, (uint32_t)(ptr + 0x3c)); // j applyProtokernelPatches
-
-  // Set OSDSYS address
-  protoEPC = (void *)exec.epc;
-
-  // Mangle system update paths to prevent OSDSYS from loading system updates
-  while ((ptr = (uint8_t *)findString("EXEC-SYSTEM", (char *)protoEPC, 0x100000)))
-    ptr[2] = '\0';
-
-  int n = 0;
-  char *args[2];
-  args[n++] = "rom0:";
-  if (settings.patcherFlags & FLAG_BOOT_BROWSER)
-    args[n++] = "BootBrowser"; // Pass BootBrowser to launch internal mc browser
-  else if ((settings.patcherFlags & FLAG_SKIP_DISC) || (settings.patcherFlags & FLAG_SKIP_SCE_LOGO))
-    args[n++] = "BootClock"; // Pass BootClock to skip OSDSYS intro
-
-  // Execute OSDSYS
-  resetModules();
-
-  FlushCache(0);
-  FlushCache(2);
-  ExecPS2((void *)exec.epc, (void *)exec.gp, n, args);
-  Exit(-1);
 }

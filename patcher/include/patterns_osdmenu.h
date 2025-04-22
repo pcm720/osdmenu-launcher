@@ -103,32 +103,4 @@ static uint32_t patternBrowserGetMcDirSize[] = {
 };
 static uint32_t patternBrowserGetMcDirSize_mask[] = {0xfc000000, 0xffffffff, 0xffffffff, 0xffffffff, 0xfffffff0};
 
-//
-// Protokernel patterns
-//
-
-// Pattern for injecting custom entries into the Version submenu
-static uint32_t patternVersionInit_Proto[] = {
-    // <init Unit, Browser, CD Player, PS1DRV version>
-    0x24a615c8, // addiu a2,a1,0x15C8
-    0x24a41598, // addiu a0,a1,0x1598
-    0x0c000000, // jal   getDVDPlayerVersion
-};
-static uint32_t patternVersionInit_Proto_mask[] = {0xffffffff, 0xffffffff, 0xfc000000};
-
-// Pattern for getting the address of sceCdApplySCmd function
-// After finding this pattern, go back until reaching
-// _lw(addr) & 0xffff0000 == 0x27bd0000 (addiu $sp,$sp, ?) to get the function address.
-static uint32_t patternCdApplySCmd_Proto[] = {
-    //  0x27bd0000, // addiu $sp,$sp,??
-    //  ~50 instructions
-    0x26500000, // addiu s0,s2,??
-    0x3c058000, // lui   a1,0x8000
-    0x0200202d, // daddu a0,s0,zero
-    0x34a50593, // ori   a1,a1,0x0593
-    0x0c000000, // jal   sceSifBindRpc
-    0x0000302d, // daddu a2,zero,zero
-};
-static uint32_t patternCdApplySCmd_Proto_mask[] = {0xffff0000, 0xffffffff, 0xffffffff, 0xffffffff, 0xfc000000, 0xffffffff};
-
 #endif

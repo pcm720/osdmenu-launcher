@@ -476,12 +476,9 @@ int browserGetMcDirSizeCustom() {
 }
 
 // Browser application launch patch
-void patchBrowserApplicationLaunch(uint8_t *osd, int isProtokernel) {
-  // Protokernel browser code starts at ~0x700000
-  uint32_t osdOffset = (isProtokernel) ? (PROTOKERNEL_MENU_OFFSET + 0x100000) : 0;
-
+void patchBrowserApplicationLaunch(uint8_t *osd) {
   // Find the target function
-  uint8_t *ptr = findPatternWithMask(osd + osdOffset, 0x100000, (uint8_t *)patternBrowserFileMenuInit, (uint8_t *)patternBrowserFileMenuInit_mask,
+  uint8_t *ptr = findPatternWithMask(osd, 0x100000, (uint8_t *)patternBrowserFileMenuInit, (uint8_t *)patternBrowserFileMenuInit_mask,
                                      sizeof(patternBrowserFileMenuInit));
 
   if (!ptr || ((_lw((uint32_t)ptr + 4 * 4) & 0xfc000000) != 0x0c000000))
@@ -500,196 +497,44 @@ void patchBrowserApplicationLaunch(uint8_t *osd, int isProtokernel) {
   selectedMCOffset = _lw((uint32_t)ptr2) & 0xffff;
 
   // Find the target function
-  ptr2 = findPatternWithMask(osd + osdOffset, 0x100000, (uint8_t *)patternBrowserGetMcDirSize, (uint8_t *)patternBrowserGetMcDirSize_mask,
+  ptr2 = findPatternWithMask(osd, 0x100000, (uint8_t *)patternBrowserGetMcDirSize, (uint8_t *)patternBrowserGetMcDirSize_mask,
                              sizeof(patternBrowserGetMcDirSize));
   if (!ptr2)
     return;
   // Get the original function call and save the address
   browserGetMcDirSize = (void *)((_lw((uint32_t)ptr2) & 0x03ffffff) << 2);
 
-  if (isProtokernel)
-    // Use fixed address for protokernels. The call tree is way more complicated on these,
-    // so it's not worth the trouble since the address is identical for both 1.00 and 1.01
-    sceMcGetDirResultAddr = 0x008f66d0;
-  else {
-    // Trace the sceMcGetDir result buffer address
-    // From the browserGetMcDirSize function, get the address of the next function call
-    //  that retrieves directory size for mc0/mc1. This function sends sceMcGetDir request
-    //  to the libmc worker thread. The buffer address is stored in $t0.
-    // This function loads the upper part of the address to $v0
-    // adds the base offset to $s1, adds constant offset and puts the result into $t0.
-    // So, to get the address:
-    // 1. Find the first load into $v0 (lui   v0,????)
-    // 2. Find the first add into $s1  (addiu s1,v0,????)
-    // 3. Add the constant offset 0xc38 (same for all ROM versions >=1.10)
-    uint32_t offset = (uint32_t)browserGetMcDirSize;
+  // Trace the sceMcGetDir result buffer address
+  // From the browserGetMcDirSize function, get the address of the next function call
+  //  that retrieves directory size for mc0/mc1. This function sends sceMcGetDir request
+  //  to the libmc worker thread. The buffer address is stored in $t0.
+  // This function loads the upper part of the address to $v0
+  // adds the base offset to $s1, adds constant offset and puts the result into $t0.
+  // So, to get the address:
+  // 1. Find the first load into $v0 (lui   v0,????)
+  // 2. Find the first add into $s1  (addiu s1,v0,????)
+  // 3. Add the constant offset 0xc38 (same for all ROM versions >=1.10)
+  uint32_t offset = (uint32_t)browserGetMcDirSize;
 
-    // Find the first function call in browserGetMcDirSize and get the function address
-    while ((_lw(offset) & 0xfc000000) != 0x0c000000)
-      offset += 4;
-    offset = (_lw((uint32_t)offset) & 0x03ffffff) << 2;
+  // Find the first function call in browserGetMcDirSize and get the function address
+  while ((_lw(offset) & 0xfc000000) != 0x0c000000)
+    offset += 4;
+  offset = (_lw((uint32_t)offset) & 0x03ffffff) << 2;
 
-    // Initialize with fixed offset
-    sceMcGetDirResultAddr = 0xc38;
+  // Initialize with fixed offset
+  sceMcGetDirResultAddr = 0xc38;
 
-    // Search for lui v0,???? instruction to get the upper part
-    while ((_lw(offset) & 0x3c020000) != 0x3c020000)
-      offset += 4;
-    sceMcGetDirResultAddr |= (_lw(offset) & 0xffff) << 16;
+  // Search for lui v0,???? instruction to get the upper part
+  while ((_lw(offset) & 0x3c020000) != 0x3c020000)
+    offset += 4;
+  sceMcGetDirResultAddr |= (_lw(offset) & 0xffff) << 16;
 
-    // Search for addiu s1,v0,???? to get the lower part (might be negative)
-    while ((_lw(offset) & 0x24510000) != 0x24510000)
-      offset += 4;
-    sceMcGetDirResultAddr += (int32_t)((int16_t)(_lw(offset) & 0xffff));
-  }
+  // Search for addiu s1,v0,???? to get the lower part (might be negative)
+  while ((_lw(offset) & 0x24510000) != 0x24510000)
+    offset += 4;
+  sceMcGetDirResultAddr += (int32_t)((int16_t)(_lw(offset) & 0xffff));
 
   // Replace original functions
   _sw((0x0c000000 | ((uint32_t)browserDirSubmenuInitViewCustom >> 2)), (uint32_t)ptr); // jal browserDirSubmenuInitViewCustom
   _sw((0x0c000000 | ((uint32_t)browserGetMcDirSizeCustom >> 2)), (uint32_t)ptr2);      // jal browserGetMcDirSizeCustom
-}
-
-//
-// Protokernel patches
-//
-
-// getDVDPlayerVersion attempts to get DVD player version and writes
-// "DVD Player" to label, version to value and terminates the submenu
-// or terminates all three if it couldn't get the version. Returns player version.
-static char *(*getDVDPlayerVersion)(char *label, char *value, char *submenu) = NULL;
-
-// This function will be called every time the version menu opens
-char *versionInfoInitHandlerProtokernel(char *label, char *value, char *submenu) {
-  // Execute the original function
-  char *res = getDVDPlayerVersion(label, value, submenu);
-
-  // Extend the string table used by the version menu drawing function.
-  // It picks up the entries automatically and stops once it reads an empty string
-  //
-  // Each table entry is represented as follows:
-  // First 32 bytes — entry name string
-  // 16 bytes — entry value string
-  // 1024 bytes — submenu as a list of newline-separated submenu entries where each menu entry is represented
-  //  as a comma-separated list of strings (e.g. 'Disc Speed,Standard,Fast\nTexture Mapping,Standard,Smooth\n').
-  //  Used to build the menu, but not used to draw it.
-
-  // Find the first empty entry
-  uint32_t ptr = (uint32_t)label;
-  while (((char *)ptr)[0] != '\0')
-    // Go to the next offset
-    ptr += 0x430;
-
-  // Add custom entries
-  char *cValue = NULL;
-  for (int i = 0; i < sizeof(entries) / sizeof(customVersionEntry); i++) {
-    cValue = NULL;
-    if (entries[i].valueFunc)
-      cValue = entries[i].valueFuncProto();
-    else if (entries[i].value)
-      cValue = entries[i].value;
-
-    if (!cValue)
-      continue;
-
-    strncpy((char *)ptr, entries[i].name, 31);
-    strncpy((char *)ptr + 0x20, cValue, 15);
-    _sw(0, ptr + 0x30);
-
-    ptr += 0x430;
-  }
-
-  return res;
-}
-
-// Protokernels use a much simpler version of the init function that just loads
-// static values into the pre-defined locations (except for DVD Player version)
-// Thankfully, the drawing function is dynamic.
-// Extends version menu with custom entries by overriding the function called every time the version menu opens
-void patchVersionInfoProtokernel(uint8_t *osd) {
-  // Find the function that inits version menu entries
-  uint8_t *ptr = findPatternWithMask(osd, 0x100000, (uint8_t *)patternVersionInit_Proto, (uint8_t *)patternVersionInit_Proto_mask,
-                                     sizeof(patternVersionInit_Proto));
-  if (!ptr)
-    return;
-
-  // Advance ptr to point to the function call
-  ptr += 8;
-
-  // Get the original function call and save the address
-  uint32_t tmp = _lw((uint32_t)ptr);
-  tmp &= 0x03ffffff;
-  tmp <<= 2;
-  getDVDPlayerVersion = (void *)tmp;
-
-  // Replace versionInfoInit with the custom function
-  tmp = 0x0c000000;
-  tmp |= ((uint32_t)versionInfoInitHandlerProtokernel >> 2);
-  _sw(tmp, (uint32_t)ptr); // jal versionInfoInitHandlerProtokernel
-
-  // Find sceCdApplySCmd address
-  ptr = findPatternWithMask(osd, 0x100000, (uint8_t *)patternCdApplySCmd_Proto, (uint8_t *)patternCdApplySCmd_Proto_mask,
-                            sizeof(patternCdApplySCmd_Proto));
-  if (ptr) {
-    uint32_t fnptr = (uint32_t)ptr;
-    while ((_lw(fnptr) & 0xffff0000) != 0x27bd0000)
-      fnptr -= 4;
-
-    sceCdApplySCmd = (void *)fnptr;
-  }
-
-  // Initialize static values
-  // ROM version. Protokernels don't support control characters so it might not fit.
-  if (settings.romver[0] != '\0') {
-    strncpy(romverValue, settings.romver, 15);
-  } else {
-    romverValue[0] = '-';  // Put placeholer value
-    romverValue[1] = '\0'; // Put placeholer value
-  }
-
-  // EE Revision
-  formatRevision(eeRevision, GetCop0(15));
-}
-
-// Overrides SetGsCrt and sceGsPutDispEnv functions to support 480p and 1080i output modes
-// ALWAYS call restoreGSVideoMode before launching apps
-uint32_t osdOffset = 0x300000;
-void patchGSVideoModeProtokernel(uint8_t *osd, GSVideoMode outputMode) {
-  if (outputMode < GS_MODE_DTV_480P)
-    return; // Do not apply patch for PAL/NTSC modes
-
-  // Get the address of the original SetGsCrt handler and translate it to kernel mode address range used by syscalls (kseg0)
-  origSetGsCrt = (void *)(((uint32_t)GetSyscallHandler(0x2) & 0x0fffffff) | 0x80000000);
-  if (!origSetGsCrt)
-    return;
-
-  // Find sceGsPutDispEnv address
-  // There are three occurrences of sceGsPutDispEnv at base addresses
-  // 0x500000, 0x600000 and 0x700000. OSDSYS is loaded at 0x200000
-  while (osdOffset < 0x600000) {
-    uint8_t *ptr = findPatternWithMask(osd + osdOffset, 0x100000, (uint8_t *)patternGsPutDispEnv, (uint8_t *)patternGsPutDispEnv_mask,
-                                       sizeof(patternGsPutDispEnv));
-    if (!ptr) {
-      origSetGsCrt = NULL;
-      return;
-    }
-
-    // Replace call to sceGsPutDispEnv with the custom function
-    uint32_t tmp = 0x0c000000;
-    tmp |= ((uint32_t)gsPutDispEnv >> 2);
-    _sw(tmp, (uint32_t)ptr); // jal gsPutDispEnv
-
-    osdOffset += 0x100000;
-  }
-
-  // Replace SetGsCrt with custom handler
-  switch (outputMode) {
-  case GS_MODE_DTV_480P:
-    selectedMode = outputMode;
-    SetSyscall(0x2, (void *)(((uint32_t)(setGsCrt480p) & ~0xE0000000) | 0x80000000));
-    break;
-  case GS_MODE_DTV_1080I:
-    selectedMode = outputMode;
-    SetSyscall(0x2, (void *)(((uint32_t)(setGsCrt1080i) & ~0xE0000000) | 0x80000000));
-    break;
-  default:
-  }
 }
