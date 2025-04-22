@@ -4,7 +4,7 @@
 #include "gs.h"
 #include <stdint.h>
 
-#define CUSTOM_ITEMS 255 // Max number of items in custom menu
+#define CUSTOM_ITEMS 250 // Max number of items in custom menu
 #define NAME_LEN 80      // Max menu item length (incl. the string terminator)
 
 typedef enum {

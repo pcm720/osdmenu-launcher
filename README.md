@@ -125,7 +125,7 @@ Most of `OSDMENU.CNF` settings are directly compatible with those from FMCB 1.8 
 
 ### Character limits
 
-OSDMenu supports up to 255 custom menu entries, each up to 79 characters long.  
+OSDMenu supports up to 250 custom menu entries, each up to 79 characters long.  
 Note that left and right cursors are limited to 19 characters and top and bottom delimiters are limited to 79 characters.  
 Launcher and DKWDRV paths are limited to 49 characters.
 

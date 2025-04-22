@@ -22,35 +22,37 @@ vmode_t vmodes[] = {
     {GS_MODE_PAL, 640, 512, 0, 32, 4},  // PAL
     {GS_MODE_NTSC, 640, 448, 0, 32, 4}, // NTSC
 };
-vmode_t *selectedMode;
 
 // Max coordinates for currently initialized video mode
 static uint16_t gsMaxX = 0;
 static uint16_t gsMaxY = 0;
 
-int gsInit(vmode_t *mode);
 void gsClearScreen();
 void gsPrintBitmap(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint32_t *data);
 
 // Initializes GS and displays FMCB splash screen
 void gsDisplaySplash(GSVideoMode mode) {
   int splashY = 185;
-  selectedMode = &(vmodes[1]);
-
   if (mode == GS_MODE_PAL) {
     splashY = 247;
-    selectedMode = &(vmodes[0]);
   }
 
-  gsInit(selectedMode);
+  gsInit(mode);
   gsClearScreen();
   gsPrintBitmap((640 - splashWidth) / 2, splashY, splashWidth, splashHeight, splash);
 }
 
 DECLARE_GS_PACKET(gsDMABuf, 50);
 
-// Initializes GS
-int gsInit(vmode_t *mode) {
+// Resets and initializes GS
+int gsInit(GSVideoMode vmode) {
+  vmode_t *mode;
+
+  if (vmode == GS_MODE_PAL)
+    mode = &vmodes[0];
+  else
+    mode = &vmodes[1];
+
   gsMaxX = mode->width - 1;
   gsMaxY = mode->height - 1;
 

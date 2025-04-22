@@ -26,8 +26,11 @@ void launchItem(char *item) {
     }
   }
 
+  // Revert video patch and deinit OSDSYS
   restoreGSVideoMode();
   deinitOSDSYS();
+  // Clear the screen
+  gsInit(settings.videoMode);
 
   // Reinitialize DMAC, VU0/1, VIF0/1, GIF, IPU
   ResetEE(0x7F);
