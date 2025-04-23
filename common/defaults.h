@@ -5,15 +5,15 @@
 // All files must be placed on the memory card.
 // mc? paths are also supported.
 #ifndef CONF_PATH
-#define CONF_PATH "mc0:/SYS-CONF/OSDMENU.CNF"
+#define CONF_PATH "pfs1:/OSDMENU/OSDMENU.CNF"
 #endif
 
 #ifndef LAUNCHER_PATH
-#define LAUNCHER_PATH "mc0:/BOOT/launcher.elf"
+#define LAUNCHER_PATH "pfs1:/OSDMENU/launcher.elf"
 #endif
 
 #ifndef DKWDRV_PATH
-#define DKWDRV_PATH "mc0:/BOOT/DKWDRV.ELF"
+#define DKWDRV_PATH "pfs1:/OSDMENU/DKWDRV.ELF"
 #endif
 
 #endif

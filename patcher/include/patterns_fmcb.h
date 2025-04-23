@@ -103,24 +103,24 @@ static uint32_t patternDrawButtonPanel_3[] = {
 static uint32_t patternDrawButtonPanel_3_mask[] = {0xffffffff, 0xffffffff, 0xffffff00, 0xff00ffff, 0xffff0000, //
                                                    0xfc000000, 0xffffffff};
 
-// Patterns for patching the ExecuteDisc function to override the disc launch handlers
+// Patterns for patching the ExecuteDisc function to override the disc launch handlers -- HDD-OSD compatible
 static uint32_t patternExecuteDisc[] = {
     // ExecuteDisc function
     0x27bdfff0, //    addiu	sp, sp, $fff0
     0x3c03001f, //    lui	v1, $001f
     0xffbf0000, //    sd	ra, $0000(sp)
     0x0080302d, //    daddu	a2, a0, zero
-    0x8c620014, //    lw	v0, $0014(v1)
-    0x2c420007, //    sltiu	v0, v0, 7
+    0x8c620010, //    lw	v0, $001?(v1)
+    0x2c420000, //    sltiu	v0, v0, 7/8
     0x10400000, //    beq	v0, zero, quit
     0x00000000, //    li	v0, 1		# or ld ra,(sp)
     0x3c02001f, //    lui	v0, $001f
-    0x8c420014, //    lw	v0, $0014(v0)
+    0x8c420010, //    lw	v0, $001?(v0)
     0x3c030000, //    lui	v1, xxxx
     0x24630000  //    addiu	v1, v1, xxxx
 };
-static uint32_t patternExecuteDisc_mask[] = {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, //
-                                             0xffffff00, 0x00000000, 0xffffffff, 0xffffffff, 0xffffff00, 0xffff0000};
+static uint32_t patternExecuteDisc_mask[] = {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xfffffff0, 0xfffffff0, //
+                                             0xffffff00, 0x00000000, 0xffffffff, 0xfffffff0, 0xffffff00, 0xffff0000};
 
 // Patterns for patching the disc detection to bypass automatic disc launch
 static uint32_t patternDetectDisc_1[] = {

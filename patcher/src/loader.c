@@ -8,6 +8,8 @@
 #include <malloc.h>
 #include <sifrpc.h>
 #include <string.h>
+#define NEWLIB_PORT_AWARE
+#include <fileXio_rpc.h>
 
 // Executes selected item by passing it to the launcher
 void launchItem(char *item) {
@@ -30,7 +32,7 @@ void launchItem(char *item) {
   restoreGSVideoMode();
   deinitOSDSYS();
   // Clear the screen
-  gsInit(settings.videoMode);
+  // gsInit(settings.videoMode);
 
   // Reinitialize DMAC, VU0/1, VIF0/1, GIF, IPU
   ResetEE(0x7F);
@@ -41,6 +43,10 @@ void launchItem(char *item) {
 
   FlushCache(0);
   FlushCache(2);
+
+
+  if (fileXioMount("pfs1:", "hdd0:__sysconf", 0))
+    __builtin_trap();
 
   // Build argv for the launcher
   char **argv;
@@ -76,6 +82,10 @@ void launchItem(char *item) {
   SifLoadFileInit();
   int ret = SifLoadElf(argv[0], &elfdata);
   SifLoadFileExit();
+
+  if (fileXioUmount("pfs1:"))
+    __builtin_trap();
+
   sceSifExitRpc();
   if (ret == 0 && elfdata.epc != 0) {
     FlushCache(0);

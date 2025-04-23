@@ -84,19 +84,19 @@ void patchExecuteOSDSYS(void *epc, void *gp) {
 
   int n = 0;
   char *args[5];
-  args[n++] = "rom0:";
-  if (settings.patcherFlags & FLAG_BOOT_BROWSER)
-    args[n++] = "BootBrowser"; // Pass BootBrowser to launch internal mc browser
-  else if ((settings.patcherFlags & FLAG_SKIP_DISC) || (settings.patcherFlags & FLAG_SKIP_SCE_LOGO))
-    args[n++] = "BootClock"; // Pass BootClock to skip OSDSYS intro
+  args[n++] = "hdd0:__system:pfs:/osd100/hosdsys.elf";
+  // if (settings.patcherFlags & FLAG_BOOT_BROWSER)
+  //   args[n++] = "BootBrowser"; // Pass BootBrowser to launch internal mc browser
+  // else if ((settings.patcherFlags & FLAG_SKIP_DISC) || (settings.patcherFlags & FLAG_SKIP_SCE_LOGO))
+  //   args[n++] = "BootClock"; // Pass BootClock to skip OSDSYS intro
 
-  if (findString("SkipMc", (char *)epc, 0x100000)) // Pass SkipMc argument
-    args[n++] = "SkipMc";                          // Skip mc?:/BREXEC-SYSTEM/osdxxx.elf update on v5 and above
+  // if (findString("SkipMc", (char *)epc, 0x100000)) // Pass SkipMc argument
+  //   args[n++] = "SkipMc";                          // Skip mc?:/BREXEC-SYSTEM/osdxxx.elf update on v5 and above
 
-  if (findString("SkipHdd", (char *)epc, 0x100000)) // Pass SkipHdd argument if the ROM supports it
-    args[n++] = "SkipHdd";                          // Skip HDDLOAD on v5 and above
-  else
-    patchSkipHDD((uint8_t *)epc); // Skip HDD patch for earlier ROMs
+  // if (findString("SkipHdd", (char *)epc, 0x100000)) // Pass SkipHdd argument if the ROM supports it
+  //   args[n++] = "SkipHdd";                          // Skip HDDLOAD on v5 and above
+  // else
+  //   patchSkipHDD((uint8_t *)epc); // Skip HDD patch for earlier ROMs
 
   // Apply disc launch patch to forward disc launch to the launcher
   patchDiscLaunch((uint8_t *)epc);
@@ -118,13 +118,17 @@ void patchExecuteOSDSYS(void *epc, void *gp) {
   Exit(-1);
 }
 
+#define NEWLIB_PORT_AWARE
+#include <fileXio_rpc.h>
 // Loads OSDSYS from ROM and handles the patching
 void launchOSDSYS() {
   uint8_t *ptr;
   t_ExecData exec;
 
-  if (SifLoadElf("rom0:OSDSYS", &exec) || (exec.epc < 0))
+  if (SifLoadElfEncrypted("pfs0:/osd100/hosdsys.elf", &exec) || (exec.epc < 0))
     return;
+
+  fileXioUmount("pfs0:");
 
   // Find the ExecPS2 function in the unpacker starting from 0x100000.
   ptr = findPatternWithMask((uint8_t *)0x100000, 0x1000, (uint8_t *)patternExecPS2, (uint8_t *)patternExecPS2_mask, sizeof(patternExecPS2));
@@ -138,9 +142,13 @@ void launchOSDSYS() {
 
   resetModules();
 
+  int argc = 0;
+  char *argv[1];
+  argv[argc++] = "hdd0:__system:pfs:/osd100/hosdsys.elf";
+
   // Execute the OSD unpacker. If the above patching was successful it will
   // call the patchExecuteOSDSYS() function after unpacking.
-  ExecPS2((void *)exec.epc, (void *)exec.gp, 0, NULL);
+  ExecPS2((void *)exec.epc, (void *)exec.gp, argc, argv);
   Exit(-1);
 }
 

@@ -3,12 +3,13 @@
 #include "patches_common.h"
 #include "settings.h"
 #include "splash.h"
+#include <fcntl.h>
 #include <kernel.h>
 #include <ps2sdkapi.h>
 #include <stdlib.h>
 #include <string.h>
 #define NEWLIB_PORT_AWARE
-#include <fileio.h>
+#include <fileXio_rpc.h>
 
 // Reduce binary size by disabling the unneeded functionality
 void _libcglue_init() {}
@@ -20,24 +21,11 @@ PS2_DISABLE_AUTOSTART_PTHREAD();
 
 // Tries to open launcher ELF on both memory cards
 int probeLauncher() {
-  if (settings.launcherPath[2] == '?') {
-    if (settings.mcSlot == 1)
-      settings.launcherPath[2] = '1';
-    else
-      settings.launcherPath[2] = '0';
-  }
+  int fd = open(settings.launcherPath, O_RDONLY);
+  if (fd < 0)
+    return -1;
 
-  int fd = fioOpen(settings.launcherPath, FIO_O_RDONLY);
-  if (fd < 0) {
-    // If ELF doesn't exist on boot MC, try the other slot
-    if (settings.launcherPath[2] == '1')
-      settings.launcherPath[2] = '0';
-    else
-      settings.launcherPath[2] = '1';
-    if ((fd = fioOpen(settings.launcherPath, FIO_O_RDONLY)) < 0)
-      return -1;
-  }
-  fioClose(fd);
+  close(fd);
 
   return 0;
 }
@@ -47,16 +35,14 @@ int main(int argc, char *argv[]) {
   wipeUserMem();
 
   // Load needed modules
-  initModules();
+  if (initModules())
+    __builtin_trap();
+
+  if (fileXioMount("pfs1:", "hdd0:__sysconf", 0))
+    __builtin_trap();
 
   // Set FMCB & OSDSYS default settings for configureable items
   initConfig();
-
-  // Determine from which mc slot FMCB was booted
-  if (!strncmp(argv[0], "mc0", 3))
-    settings.mcSlot = 0;
-  else if (!strncmp(argv[0], "mc1", 3))
-    settings.mcSlot = 1;
 
   // Read config before to check args for an elf to load
   loadConfig();
@@ -64,6 +50,12 @@ int main(int argc, char *argv[]) {
   // Make sure launcher is accessible
   if (probeLauncher())
     Exit(-1);
+
+  if (fileXioUmount("pfs1:"))
+    __builtin_trap();
+
+  if (fileXioMount("pfs0:", "hdd0:__system", 0))
+    __builtin_trap();
 
 #ifdef ENABLE_SPLASH
   GSVideoMode vmode = GS_MODE_NTSC; // Use NTSC by default

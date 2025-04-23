@@ -458,8 +458,8 @@ void patchMenuButtonPanel(uint8_t *osd) {
 }
 
 // An array that stores what function to call for each disc type.
-// Later PS2 ROMs:
-// uint32_t *discLaunchHandlers[7] = {
+// HDD-OSD:
+// uint32_t *discLaunchHandlers[8] = {
 //    exec_ps2_game_disc,		// PS2 game DVD
 //    exec_ps2_game_disc,		// PS2 game CD
 //    exec_ps1_game_disc,		// PS1 game CD
@@ -467,6 +467,7 @@ void patchMenuButtonPanel(uint8_t *osd) {
 //    do_nothing,				    // none (return 1)
 //    do_nothing,				    // none (return 1)
 //    exec_hdd_stuff			  // HDDLOAD
+//    exec_hdd_app          // Execute HDD application
 //}
 // Patches the disc launch handlers to load discs with the launcher
 void patchDiscLaunch(uint8_t *osd) {

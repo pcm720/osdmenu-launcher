@@ -25,7 +25,7 @@ SECTIONS {
 	/*.text 0x000a8000: {*/
 	/* .text 0x000b0000: { */
 	/*.text 0x00090000: {*/
-	.text 0x000db000: {
+	.text 0x000b0000: {
 		_ftext = . ;
 		*(.text)
 		*(.text.*)

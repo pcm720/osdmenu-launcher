@@ -66,24 +66,9 @@ nextLine:
 
 // Loads config file from the memory card
 int loadConfig(void) {
-  if (settings.mcSlot == 1)
-    cnfPath[2] = '1';
-  else
-    cnfPath[2] = '0';
-
   int fd = fioOpen(cnfPath, FIO_O_RDONLY);
-  if (fd < 0) {
-    // If CNF doesn't exist on boot MC, try the other slot
-    if (settings.mcSlot == 1)
-      cnfPath[2] = '0';
-    else
-      cnfPath[2] = '1';
-    if ((fd = fioOpen(cnfPath, FIO_O_RDONLY)) < 0)
+  if (fd < 0)
       return -1;
-  }
-
-  // Change mcSlot to point to the memory card contaning the config file
-  settings.mcSlot = cnfPath[2] - '0';
 
   size_t cnfSize = fioLseek(fd, 0, FIO_SEEK_END);
   fioLseek(fd, 0, FIO_SEEK_SET);
