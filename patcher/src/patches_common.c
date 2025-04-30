@@ -42,6 +42,9 @@ char *findString(const char *string, char *buf, uint32_t bufsize) {
   return NULL;
 }
 
+extern unsigned char ps2atad_irx[] __attribute__((aligned(16)));
+extern uint32_t size_ps2atad_irx;
+
 // Applies patches and executes OSDSYS
 void patchExecuteOSDSYS(void *epc, void *gp) {
   if (settings.patcherFlags & FLAG_CUSTOM_MENU) {

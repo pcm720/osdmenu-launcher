@@ -1,7 +1,9 @@
 #ifndef _PATTERNS_FMCB_H_
 #define _PATTERNS_FMCB_H_
 // FMCB 1.8 OSDSYS patch patterns by Neme
+// HDD-OSD patterns by pcm720
 #include <stdint.h>
+
 
 // Pattern for finding OSD menu info struct
 static uint32_t patternMenuInfo[] = {
@@ -103,7 +105,7 @@ static uint32_t patternDrawButtonPanel_3[] = {
 static uint32_t patternDrawButtonPanel_3_mask[] = {0xffffffff, 0xffffffff, 0xffffff00, 0xff00ffff, 0xffff0000, //
                                                    0xfc000000, 0xffffffff};
 
-// Patterns for patching the ExecuteDisc function to override the disc launch handlers -- HDD-OSD compatible
+// Patterns for patching the ExecuteDisc function to override the disc launch handlers
 static uint32_t patternExecuteDisc[] = {
     // ExecuteDisc function
     0x27bdfff0, //    addiu	sp, sp, $fff0
@@ -122,38 +124,20 @@ static uint32_t patternExecuteDisc[] = {
 static uint32_t patternExecuteDisc_mask[] = {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xfffffff0, 0xfffffff0, //
                                              0xffffff00, 0x00000000, 0xffffffff, 0xfffffff0, 0xffffff00, 0xffff0000};
 
-// Patterns for patching the disc detection to bypass automatic disc launch
-static uint32_t patternDetectDisc_1[] = {
-    // Code around main menu disc detection part1
-    0xac220cec, //    sw	v0, $0cec(at)
-    0x0c000000, //    jal	xxxx
-    0x00000000, //    nop
-    0x0c000000, //    jal	xxxx
-    0x00000000, //    nop
-    0x3c02001f, //    lui	v0, $001f
-    0x26440000, //    addiu	a0, s2, $xxxx
-    0x8c430c44, //    lw	v1, $0c44(v0)
-    0x0c000000, //    jal	xxxx
-    0xac830008, //    sw	v1, $0008(a0)
-    0x10000000, //    beq	zero, zero, xxxx
-    0x26420000  //    addiu	v0, s2, $xxxx
+
+// Pattern for patching the automatic disc launch
+static uint32_t patternDetectDisc[] = {
+  // Find the jump table in main() responsible for setting the disc type for the disc launch handler
+  0x306300ff, // andi v1,v1,0xff
+  0x10640022, // beq  v1,a0 0x0022
+  0x28620015, // slti v0,v1 0x0015
+  0x10400007, // beq  v1,a0 0x0007
+  0x28620012, // slti v0,v1 0x0012
+  0x10400019, // beq  v1,a0 0x0019
+  0x28620010, // slti v0,v1 0x0010
+  0x10400012, // beq  v1,a0 0x0012
 };
-static uint32_t patternDetectDisc_1_mask[] = {0xffffffff, 0xfc000000, 0xffffffff, 0xfc000000, 0xffffffff, 0xffffffff, //
-                                              0xffff0000, 0xffffffff, 0xfc000000, 0xffffffff, 0xffff0000, 0xffff0000};
-static uint32_t patternDetectDisc_2[] = {
-    // Code around main menu disc detection part2
-    0x3c02001f, //    lui	v0, $001f
-    0x24030003, //    li	v1, 3
-    0xac4305e8, //    sw	v1, $05e8(v0)
-    0x24040002, //    li	a0, 2
-    0xac4405ec, //    sw	a0, $05ec(v0)
-    0x3c10001f, //    lui	s0, $001f
-    0x24020001, //    li	v0, 1
-    0xae0205e4, //    sw	v0, $05e4(s0)
-    0x0c000000  //    jal	WaitVblankStart?
-};
-static uint32_t patternDetectDisc_2_mask[] = {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
-                                              0xffffffff, 0xffffffff, 0xffffffff, 0xfc000000};
+static uint32_t patternDetectDisc_mask[] = {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff};
 
 // Pattern for patching the menu scrolling behavior
 static uint32_t patternMenuLoop[] = {0x30621000, 0x10400007, 0x2604ffe8, 0x8c830010, 0x2462ffff, 0x0441000e, 0xac820010};
@@ -162,19 +146,5 @@ static uint32_t patternMenuLoop_mask[] = {0xffffffff, 0xffffffff, 0xffffffff, 0x
 // Pattern for patching the OSDSYS video mode
 static uint32_t patternVideoMode[] = {0xffbf0000, 0x0c000000, 0x00000000, 0x38420002, 0xdfbf0000, 0x2c420001};
 static uint32_t patternVideoMode_mask[] = {0xffffffff, 0xfc000000, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff};
-
-// Pattern for patching update loading to bypass HDD init
-static uint32_t patternHDDLoad[] = {
-    // Code near MC Update & HDD load for early ROMs not supporting SkipHdd argument
-    0x0c000000, // jal 	 CheckMcUpdate
-    0x0220282d, // daddu a1, s1, zero
-    0x3c04002a, // lui	 a0, 0x002a         #SkipHdd jump must be here
-    0x0000282d, // daddu a1, zero, zero 	#arg1: 0
-    0x24840000, // addiu a0, a0, 0xXXXX  	#arg0: "rom0:ATAD"
-    0x0c000000, // jal 	 LoadModule
-    0x0000302d, // daduu a2, zero, zero		#arg2: 0
-    0x04400000  // bltz  v0, Exit_HddLoad
-};
-static uint32_t patternHDDLoad_mask[] = {0xfc000000, 0xffffffff, 0xffffffff, 0xffffffff, 0xffff0000, 0xfc000000, 0xffffffff, 0xffff0000};
 
 #endif

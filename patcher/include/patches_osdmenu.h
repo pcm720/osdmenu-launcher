@@ -1,6 +1,6 @@
 #ifndef _PATCHES_OSDMENU_H_
 #define _PATCHES_OSDMENU_H_
-// Additional patch patterns for osdmenu-launcher
+// OSDMenu patches
 #include "gs.h"
 #include <stdint.h>
 

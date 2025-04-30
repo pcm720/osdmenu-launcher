@@ -1,3 +1,4 @@
+#include "splash.h"
 #include "init.h"
 #include "patches_common.h"
 #include "patches_osdmenu.h"
@@ -32,7 +33,7 @@ void launchItem(char *item) {
   restoreGSVideoMode();
   deinitOSDSYS();
   // Clear the screen
-  // gsInit(settings.videoMode);
+  gsInit(settings.videoMode);
 
   // Reinitialize DMAC, VU0/1, VIF0/1, GIF, IPU
   ResetEE(0x7F);

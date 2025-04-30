@@ -3,7 +3,7 @@
 # The user accepts full responsibility for any legal actions that may be taken
 # as a result of this violation, including but not limited to being sued.
 # Proceed at your own risk, and may the legal forces be ever in your favor.
-ENABLE_SPLASH ?= 0
+ENABLE_SPLASH ?= 1
 
 GIT_VERSION := $(shell git describe --always --dirty --tags --exclude nightly)
 
@@ -13,15 +13,15 @@ EE_BIN = patcher_unc.elf
 EE_INCS = -I../common -I$(PS2SDK)/ee/include -I$(PS2SDK)/common/include -I$(PS2SDK)/sbv/include -Iinclude -I$(PS2SDK)/ports/include
 
 EE_LINKFILE = linkfile
-EE_LIBS = -lpatches -lfileXio
+EE_LIBS = -lpatches -lfileXio -ldma
 
-EE_OBJS = main.o settings.o init.o loader.o patches_common.o patches_fmcb.o patches_osdmenu.o
+EE_OBJS = main.o settings.o init.o loader.o patches_common.o patches_fmcb.o patches_osdmenu.o gs.o
 
 IRX_FILES += iomanX.irx fileXio.irx ps2dev9.irx ps2atad.irx ps2hdd.irx ps2fs.irx
 
 # C compiler flags
 EE_CFLAGS := -D_EE -O2 -G0 -Wall $(EE_CFLAGS) -DGIT_VERSION="\"${GIT_VERSION}\""
-EE_LDFLAGS += -Wl,-zmax-page-size=128 -Wl,--gc-sections #-s
+EE_LDFLAGS += -Wl,-zmax-page-size=128 -Wl,--gc-sections -s
 EE_CFLAGS += -fdata-sections -ffunction-sections
 
 # Reduce binary size by using newlib-nano
@@ -31,7 +31,6 @@ NEWLIB_NANO = 1
 ifeq ($(ENABLE_SPLASH), 1)
  EE_OBJS += splash.o
  EE_CFLAGS += -DENABLE_SPLASH
- EE_LIBS += -ldma
 endif
 
 ifdef CONF_PATH

@@ -168,6 +168,7 @@ New to this launcher:
 ## Credits
 
 - Everyone involved in developing the original Free MC Boot and OSDSYS patches, especially Neme and jimmikaelkael
+- Julian Uy for mapping out significant parts of HDD-OSD for [osdsys_re](https://github.com/ps2re/osdsys_re) project
 - [TonyHax International](https://github.com/alex-free/tonyhax) developers for PS1 game ID detection for generic executables.
 - Maximus32 for creating the [`smap_udpbd` module](
 https://github.com/rickgaiser/neutrino) and Neutrino GSM

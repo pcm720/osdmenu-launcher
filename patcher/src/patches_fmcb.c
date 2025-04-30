@@ -460,8 +460,8 @@ void patchMenuButtonPanel(uint8_t *osd) {
 // An array that stores what function to call for each disc type.
 // HDD-OSD:
 // uint32_t *discLaunchHandlers[8] = {
-//    exec_ps2_game_disc,		// PS2 game DVD
-//    exec_ps2_game_disc,		// PS2 game CD
+//    exec_ps2_game_disc,		// PS2 game
+//    exec_ps2_game_disc,		// PS2 game
 //    exec_ps1_game_disc,		// PS1 game CD
 //    exec_dvdv_disc,			  // DVD Video
 //    do_nothing,				    // none (return 1)
@@ -492,26 +492,13 @@ void patchDiscLaunch(uint8_t *osd) {
 
 // Patches automatic disc launch
 void patchSkipDisc(uint8_t *osd) {
-  uint8_t *ptr;
-  uint32_t tmp, addr2, addr3, dist;
-
-  ptr = findPatternWithMask(osd, 0x100000, (uint8_t *)patternDetectDisc_1, (uint8_t *)patternDetectDisc_1_mask, sizeof(patternDetectDisc_1));
+  uint8_t *ptr = findPatternWithMask(osd, 0x100000, (uint8_t *)patternDetectDisc, (uint8_t *)patternDetectDisc_mask, sizeof(patternDetectDisc));
   if (!ptr)
     return;
-  addr2 = (uint32_t)ptr;
 
-  ptr = findPatternWithMask(osd, 0x100000, (uint8_t *)patternDetectDisc_2, (uint8_t *)patternDetectDisc_2_mask, sizeof(patternDetectDisc_2));
-  if (!ptr)
-    return;
-  addr3 = (uint32_t)ptr;
-
-  tmp = addr2 + 48; // patch start
-  dist = ((addr3 - tmp) >> 2) - 1;
-  if (dist > 0x40)
-    return;
-
-  _sw(0x10000000 + dist, tmp); // branch to addr3
-  _sw(0, tmp + 4);             // nop
+  // NOP out the jump table
+  for (uint32_t i = 0; i < (sizeof(patternDetectDisc) / sizeof(uint32_t)); i++)
+    _sw(0, (uint32_t)ptr + i * 4);
 }
 
 static uint32_t menuLoopPatch_1[7] = {0x8e04fff8, 0x8e05fff0, 0x0004102a, 0x0082280b, 0x20a3ffff, 0x1000000c, 0xae03fff8};
@@ -559,19 +546,4 @@ void patchVideoMode(uint8_t *osd, GSVideoMode mode) {
     _sw(0x24020001, (uint32_t)ptr + 20); // set return value to 1
   else
     _sw(0x0000102d, (uint32_t)ptr + 20); // set return value to 0 to force NTSC
-}
-
-// Patches HDD update code for ROMs not supporting "SkipHdd" arg
-void patchSkipHDD(uint8_t *osd) {
-  uint8_t *ptr;
-  uint32_t addr;
-
-  // Search code near MC Update & HDD load
-  ptr = findPatternWithMask(osd, 0x100000, (uint8_t *)patternHDDLoad, (uint8_t *)patternHDDLoad_mask, sizeof(patternHDDLoad));
-  if (!ptr)
-    return;
-  addr = (uint32_t)ptr;
-
-  // Place "beq zero, zero, Exit_HddLoad" just after CheckMcUpdate() call
-  _sw(0x10000000 + ((signed short)(_lw(addr + 28) & 0xffff) + 5), addr + 8);
 }
