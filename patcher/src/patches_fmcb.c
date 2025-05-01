@@ -499,6 +499,15 @@ void patchSkipDisc(uint8_t *osd) {
   // NOP out the jump table
   for (uint32_t i = 0; i < (sizeof(patternDetectDisc) / sizeof(uint32_t)); i++)
     _sw(0, (uint32_t)ptr + i * 4);
+
+  ptr = findPatternWithMask(osd, 0x100000, (uint8_t *)patternDetectDisc_Clock, (uint8_t *)patternDetectDisc_Clock_mask,
+                                     sizeof(patternDetectDisc_Clock));
+  if (!ptr)
+    return;
+
+  // NOP out the jump table
+  for (uint32_t i = 0; i < (sizeof(patternDetectDisc_Clock) / sizeof(uint32_t)); i++)
+    _sw(0, (uint32_t)ptr + i * 4);
 }
 
 static uint32_t menuLoopPatch_1[7] = {0x8e04fff8, 0x8e05fff0, 0x0004102a, 0x0082280b, 0x20a3ffff, 0x1000000c, 0xae03fff8};

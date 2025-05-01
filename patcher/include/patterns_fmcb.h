@@ -4,7 +4,6 @@
 // HDD-OSD patterns by pcm720
 #include <stdint.h>
 
-
 // Pattern for finding OSD menu info struct
 static uint32_t patternMenuInfo[] = {
     0x00000001, // unknown
@@ -124,20 +123,40 @@ static uint32_t patternExecuteDisc[] = {
 static uint32_t patternExecuteDisc_mask[] = {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xfffffff0, 0xfffffff0, //
                                              0xffffff00, 0x00000000, 0xffffffff, 0xfffffff0, 0xffffff00, 0xffff0000};
 
-
 // Pattern for patching the automatic disc launch
 static uint32_t patternDetectDisc[] = {
-  // Find the jump table in main() responsible for setting the disc type for the disc launch handler
-  0x306300ff, // andi v1,v1,0xff
-  0x10640022, // beq  v1,a0 0x0022
-  0x28620015, // slti v0,v1 0x0015
-  0x10400007, // beq  v1,a0 0x0007
-  0x28620012, // slti v0,v1 0x0012
-  0x10400019, // beq  v1,a0 0x0019
-  0x28620010, // slti v0,v1 0x0010
-  0x10400012, // beq  v1,a0 0x0012
+    // Find the jump table in main() responsible for setting the disc type for the disc launch handler
+    0x306300ff, // andi v1,v1,0xff
+    0x10640022, // beq  v1,a0,0x0022
+    0x28620015, // slti v0,v1,0x0015
+    0x10400007, // beq  v1,a0,0x0007
+    0x28620012, // slti v0,v1,0x0012
+    0x10400019, // beq  v1,a0,0x0019
+    0x28620010, // slti v0,v1,0x0010
+    0x10400012, // beq  v1,a0,0x0012
 };
 static uint32_t patternDetectDisc_mask[] = {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff};
+
+static uint32_t patternDetectDisc_Clock[] = {
+    // Find the jump table in clock handler responsible for setting the disc type for the disc launch handler
+    0x10400011, // beq   v0,zero,0x0011
+    0x2862006e, // slti  v0,v1,0x006e
+    0x1040000a, // beq   v0,zero,0x000a
+    0x2862006c, // slti  v0,v1,0x006c
+    0x1040001d, // beq   v0,zero,0x001d
+    0x2862006a, // slti  v0,v1,0x006a
+    0x14400033, // bne   v0,zero,0x0033
+    0x3c02001f, // lui   v0,0x001f
+    0x3c03001f, // lui   v1,0x001f
+    0x24020002, // addiu v0,zero,0x0002
+    0xac620010, // sw    v0,0x0010,v1
+    0x10000033, // beq   zero,zero,0x0033
+    0x3c10001f, // lui   s0,0x001f
+    0x2402006e, // addiu v0,zero,0x006E
+    0x10620018, // beq   v1,v0,0x0018
+};
+static uint32_t patternDetectDisc_Clock_mask[] = {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff,
+                                                  0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff};
 
 // Pattern for patching the menu scrolling behavior
 static uint32_t patternMenuLoop[] = {0x30621000, 0x10400007, 0x2604ffe8, 0x8c830010, 0x2462ffff, 0x0441000e, 0xac820010};
