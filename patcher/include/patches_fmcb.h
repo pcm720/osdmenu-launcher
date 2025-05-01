@@ -15,7 +15,6 @@ void patchMenuButtonPanel(uint8_t *osd);
 // Patches menu scrolling
 void patchMenuInfiniteScrolling(uint8_t *osd);
 
-// Working patches
 // Patches the disc launch handlers to load discs with the launcher
 void patchDiscLaunch(uint8_t *osd);
 

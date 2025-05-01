@@ -12,7 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static uint32_t osdMenu[4 + CUSTOM_ITEMS * 3];
+static uint32_t osdMenu[4 + CUSTOM_ITEMS * 2];
 
 struct OSDMenuInfo {
   uint32_t unknown1;
@@ -86,8 +86,8 @@ void patchMenu(uint8_t *osd) {
     if (!ptr)
       return;
 
-    // Found if the current address points to the pointer to "Browser" string
-    if (_lw((uint32_t)ptr + 4) == (uint32_t)ptr - 4 * 4)
+    // Found if the current address points to the "Browser" string index
+    if (_lw((uint32_t)ptr + 4) == (uint32_t)ptr - 8 * 4)
       break;
   }
   menuAddr = (uint32_t)ptr;
@@ -123,11 +123,12 @@ void patchMenu(uint8_t *osd) {
   _sw(0x1040000a, entryAddr + 4 * 4);    // beq    v0, zero, exit
 
   // Build the OSD menu
-  osdMenu[0] = _lw(menuAddr - 4 * 4); // "Browser"
-  osdMenu[1] = _lw(menuAddr - 3 * 4);
-  osdMenu[2] = _lw(menuAddr - 2 * 4); // "System Configuration"
-  osdMenu[3] = _lw(menuAddr - 1 * 4);
-
+  // HDD-OSD uses four values per entry, but
+  // patchDrawMenu fixes this to two values per entry
+  osdMenu[0] = _lw(menuAddr - 8 * 4); // "Browser" string index
+  osdMenu[1] = _lw(menuAddr - 7 * 4);
+  osdMenu[2] = _lw(menuAddr - 4 * 4); // "System Configuration" string index
+  osdMenu[3] = _lw(menuAddr - 3 * 4);
   for (i = 0; i < settings.menuItemCount; i++) {
     osdMenu[4 + i * 2] = OSD_MAGIC + i;
     osdMenu[5 + i * 2] = 0;
@@ -141,9 +142,6 @@ static uint32_t colorSelected[4] __attribute__((aligned(16)));
 static uint32_t colorUnselected[4] __attribute__((aligned(16)));
 
 static void (*DrawMenuItem)(int X, int Y, uint32_t *color, int alpha, const char *string);
-// Protokernel DrawMenuItem expects a pointer to string address, not the string address
-// For later consoles, this function is set to DrawMenuItem
-static void (*DrawMenuItemStringPtr)(int X, int Y, uint32_t *color, int alpha, const char *string);
 static int dx = 0;
 static int vel, acc;
 static int offsY = 0;
@@ -151,6 +149,8 @@ static int fontHeight = 16;
 
 // Draws selected items
 void drawMenuItemSelected(int X, int Y, uint32_t *color, int alpha, const char *string, int num) {
+  asm volatile("move %0, $s1" : "=r"(num)::); // Get menu index from s1 register
+  num *= 8;                                   // Multiply by 8 to align with OSDSYS behavior
   int i;
 
   for (i = 0; i < 4; i++)
@@ -179,18 +179,20 @@ void drawMenuItemSelected(int X, int Y, uint32_t *color, int alpha, const char *
         acc = -acc;
       dx += vel;
       DrawMenuItem(settings.menuX, settings.menuY + Y, colorSelected, alpha, string);
-      DrawMenuItemStringPtr(settings.menuX - 220 + (dx >> 8), settings.menuY + Y, colorSelected, alpha, settings.leftCursor);
-      DrawMenuItemStringPtr(settings.menuX + 220 - (dx >> 8), settings.menuY + Y, colorSelected, alpha, settings.rightCursor);
+      DrawMenuItem(settings.menuX - 220 + (dx >> 8), settings.menuY + Y, colorSelected, alpha, settings.leftCursor);
+      DrawMenuItem(settings.menuX + 220 - (dx >> 8), settings.menuY + Y, colorSelected, alpha, settings.rightCursor);
     }
-    DrawMenuItemStringPtr(settings.menuX, settings.menuY - (settings.displayedItems * (fontHeight / 2) + (fontHeight / 2)), colorSelected, alpha,
-                          settings.menuDelimiterTop);
-    DrawMenuItemStringPtr(settings.menuX, settings.menuY + (settings.displayedItems * (fontHeight / 2) + (fontHeight / 2)), colorSelected, alpha,
-                          settings.menuDelimiterBottom);
+    DrawMenuItem(settings.menuX, settings.menuY - (settings.displayedItems * (fontHeight / 2) + (fontHeight / 2)), colorSelected, alpha,
+                 settings.menuDelimiterTop);
+    DrawMenuItem(settings.menuX, settings.menuY + (settings.displayedItems * (fontHeight / 2) + (fontHeight / 2)), colorSelected, alpha,
+                 settings.menuDelimiterBottom);
   }
 }
 
 // Draws unselected items
 void drawMenuItemUnselected(int X, int Y, uint32_t *color, int alpha, const char *string, int num) {
+  asm volatile("move %0, $s1" : "=r"(num)::); // Get menu index from s1 register
+  num *= 8;                                   // Multiply by 8 to align with OSDSYS behavior
   int i;
 
   for (i = 0; i < 4; i++)
@@ -259,7 +261,7 @@ void patchMenuDraw(uint8_t *osd) {
   pSelItem = (uint32_t)ptr; // code for selected menu item
 
   ptr = findPatternWithMask(ptr + 4, 256, (uint8_t *)patternDrawMenuItem, (uint8_t *)patternDrawMenuItem_mask, sizeof(patternDrawMenuItem));
-  if (ptr != (uint8_t *)(pSelItem + 48))
+  if (ptr != (uint8_t *)(pSelItem + 44))
     return;
   pUnselItem = (uint32_t)ptr; // code for unselected menu item
 
@@ -267,7 +269,6 @@ void patchMenuDraw(uint8_t *osd) {
   tmp &= 0x03ffffff;
   tmp <<= 2;
   DrawMenuItem = (void *)tmp;
-  DrawMenuItemStringPtr = DrawMenuItem;
 
   tmp = 0x0c000000;
   tmp |= ((uint32_t)drawMenuItemSelected >> 2);
@@ -277,15 +278,17 @@ void patchMenuDraw(uint8_t *osd) {
   tmp |= ((uint32_t)drawMenuItemUnselected >> 2);
   _sw(tmp, pUnselItem + 32); // overwrite the function call for unselected item
 
-  _sw(0x001048c0, pSelItem);       // make menu item's number the sixth param
-  _sw(0x01231021, pSelItem + 4);   // by loading it into t1 (multiplied by 8):
-  _sw(0x001048c0, pUnselItem);     // sll   t1, s0, 3
-  _sw(0x01231021, pUnselItem + 4); // addu  v0, t1, v1
+  // HDD-OSD uses four values per menu entry
+  // Adjust this behavior to match OSDSYS (two values per entry)
+  // by changing the instruction that increments the string index.
+  tmp = _lw(pUnselItem + 48); // Must be addiu ??,??,0x10
+  if ((tmp & 0xff0000ff) == 0x26000010)
+    _sw((tmp & 0xffffff00) | 0x08, pUnselItem + 48); // Modify to addiu ??,??,0x08
 }
 
 static void (*DrawNonSelectableItem)(int X, int Y, uint32_t *color, int alpha, const char *string);
 static void (*DrawIcon)(int type, int X, int Y, int alpha);
-static void (*DrawButtonPanel_1stfunc)(void);
+static void (*DrawButtonPanelGetOSDLang)(void);
 
 int ButtonsPanel_Type = 0;
 
@@ -300,7 +303,7 @@ void getButtonsPanelType(int type) {
   ButtonsPanel_Type = type;
 
   // Call original function that was overridden
-  DrawButtonPanel_1stfunc();
+  DrawButtonPanelGetOSDLang();
 }
 
 // drawNonselectableEntryLeft() is called for all items less the last
@@ -312,7 +315,8 @@ void drawNonselectableEntryLeft(int X, int Y, uint32_t *color, int alpha, const 
     if (settings.enterY == -1)
       settings.enterY = Y;
 
-    DrawNonSelectableItem(settings.enterX + 28, settings.enterY, color, alpha, string);
+    // Adding 1 to Y offset to align text with the icon
+    DrawNonSelectableItem(settings.enterX + 28, settings.enterY + 1, color, alpha, string);
   } else
     DrawNonSelectableItem(X, Y, color, alpha, string);
 }
@@ -326,7 +330,8 @@ void drawNonselectableEntryRight(int X, int Y, uint32_t *color, int alpha, const
     if (settings.versionY == -1)
       settings.versionY = Y;
 
-    DrawNonSelectableItem(settings.versionX + 28, settings.versionY, color, alpha, string);
+    // Adding 1 to Y offset to align text with the icon
+    DrawNonSelectableItem(settings.versionX + 28, settings.versionY + 1, color, alpha, string);
   } else
     DrawNonSelectableItem(X, Y, color, alpha, string);
 }
@@ -388,7 +393,7 @@ void patchMenuButtonPanel(uint8_t *osd) {
   tmp = _lw(pButtonsPanelType + 32);
   tmp &= 0x03ffffff;
   tmp <<= 2;
-  DrawButtonPanel_1stfunc = (void *)tmp; // get original function call
+  DrawButtonPanelGetOSDLang = (void *)tmp; // get original function call
 
   tmp = 0x0c000000;
   tmp |= ((uint32_t)getButtonsPanelType >> 2);
@@ -501,7 +506,7 @@ void patchSkipDisc(uint8_t *osd) {
     _sw(0, (uint32_t)ptr + i * 4);
 
   ptr = findPatternWithMask(osd, 0x100000, (uint8_t *)patternDetectDisc_Clock, (uint8_t *)patternDetectDisc_Clock_mask,
-                                     sizeof(patternDetectDisc_Clock));
+                            sizeof(patternDetectDisc_Clock));
   if (!ptr)
     return;
 
@@ -527,7 +532,7 @@ void patchMenuInfiniteScrolling(uint8_t *osd) {
 
   addr = (uint32_t *)ptr;
 
-  if (addr[9] == 0x30624000 && addr[20] == 0x24045200) {
+  if (addr[9] == 0x30624000 && addr[20] == 0x24046300) {
     src = menuLoopPatch_1;
     dst = addr + 2;
     for (i = 0; i < 7; i++)

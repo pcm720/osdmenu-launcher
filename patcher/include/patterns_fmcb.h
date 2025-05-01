@@ -48,18 +48,18 @@ static uint32_t patternUserInputHandler_mask[] = {0xffffff00, 0xffffff00, 0xffff
 // Pattern for patching the draw functions for selected/unselected items
 static uint32_t patternDrawMenuItem[] = {
     // Search pattern in the drawmenu function:
-    0x001010c0, //     sll	v0, s0, 3	# selection multiplied by 8 (offset into menu)
-    0x00431021, //     addu	v0, v0, v1	# pointer to string index
+    0x8e620000, //     lw   v0, 0x00??, s3
+    0x02421021, //     addu v0, s2, v0	# pointer to string index
     0x0c000000, //     jal	GetOSDString
     0x8c440000, //     lw	a0, $0000(v0)	# get string index
     0x0040402d, //     daddu	t0, v0, zero	# arg4: pointer to string
     0x240401ae, //     li	a0, $01ae	# arg0: X coord = 430
-    0x0220282d, //     daddu	a1, s1, zero	# arg1: Y coord
+    0x0200282d, //     daddu	a1, s0, zero	# arg1: Y coord
     0x26000000, //     addiu	a2, ??, $xxxx	# arg2: ptr to color components
     0x0c000000, //     jal	DrawMenuItem
-    0x0260382d  //     daddu	a3, s3, zero	# arg3: alpha
+    0x0280382d  //     daddu	a3, s4, zero	# arg3: alpha
 };
-static uint32_t patternDrawMenuItem_mask[] = {0xffffffff, 0xffffffff, 0xfc000000, 0xffffffff, 0xffffffff, //
+static uint32_t patternDrawMenuItem_mask[] = {0xffffff00, 0xffffffff, 0xfc000000, 0xffffffff, 0xffffffff, //
                                               0xffffffff, 0xffffffff, 0xff000000, 0xfc000000, 0xffffffff};
 
 // Patterns for patching the draw functions for bottom button prompts
@@ -73,7 +73,7 @@ static uint32_t patternDrawButtonPanel_1[] = {
     0xffb70000, //     sd	 s7, 0x00XX(sp)
     0xffb60000, //     sd	 s6, 0x00XX(sp)
     0xff000000, //     sd	 XX, 0x00XX(sp)
-    0x0c000000, //     jal 	 unknown
+    0x0c000000, //     jal getOSDLanguage
     0xff000000  //     sd	 XX, 0x00XX(sp)
 };
 static uint32_t patternDrawButtonPanel_1_mask[] = {0xffff00ff, 0xff00ff00, 0xffffffff, 0xff00ff00, 0xff00ff00, //
@@ -91,12 +91,13 @@ static uint32_t patternDrawButtonPanel_2[] = {
 };
 static uint32_t patternDrawButtonPanel_2_mask[] = {0xffffff00, 0xff00ffff, 0xffff0000, 0xffffffff, 0xffffffff, //
                                                    0xffffffff, 0xfc000000, 0xffffffff};
+
 static uint32_t patternDrawButtonPanel_3[] = {
     // Search pattern in the draw_button_panel function:
     0x0040402d, //     daddu t0, v0, zero 	 # arg4 : pointer to string
     0x0200202d, //     daddu a0, s0, zero 	 # arg0 : X
     0x3c020000, //     lui	 v0, 0x00XX
-    0x0200282d, //     daddu a1, XX, zero 	 # arg1 : Y
+    0x26000001, //     addiu a1,s4,0x0001
     0x24460000, //     addiu a2, v0, 0xXXXX  # arg2 : pointer to color struct
     0x0c000000, //     jal 	 DrawNonSelectableItem
     0x02a0382d  //     daddu a3, s5, zero 	 # arg3 : alpha
