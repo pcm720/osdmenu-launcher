@@ -9,8 +9,9 @@
 PatcherSettings settings;
 
 // Defined in common/defaults.h
-char cnfPath[] = CONF_PATH;
-char launcherPath[] = LAUNCHER_PATH;
+// char cnfPath[] = "mc?:"CONF_PATH;
+// char launcherPath[] = "mc?:"LAUNCHER_PATH;
+char cnfPath[] = "pfs0:" CONF_PATH;
 
 // getCNFString is the main CNF parser called for each CNF variable in a CNF file.
 // Input and output data is handled via its pointer parameters.
@@ -68,7 +69,7 @@ nextLine:
 int loadConfig(void) {
   int fd = fioOpen(cnfPath, FIO_O_RDONLY);
   if (fd < 0)
-      return -1;
+    return -1;
 
   size_t cnfSize = fioLseek(fd, 0, FIO_SEEK_END);
   fioLseek(fd, 0, FIO_SEEK_SET);
@@ -173,20 +174,6 @@ int loadConfig(void) {
       settings.menuItemCount++;
       continue;
     }
-    if (!strcmp(name, "path_LAUNCHER_ELF")) {
-      if (strlen(value) < 4 || strncmp(value, "mc", 2))
-        continue; // Accept only memory card paths
-
-      strncpy(settings.launcherPath, value, (sizeof(settings.launcherPath) / sizeof(char)) - 1);
-      continue;
-    }
-    if (!strcmp(name, "path_DKWDRV_ELF")) {
-      if (strlen(value) < 4 || strncmp(value, "mc", 2))
-        continue; // Accept only memory card paths
-
-      strncpy(settings.dkwdrvPath, value, (sizeof(settings.dkwdrvPath) / sizeof(char)) - 1);
-      continue;
-    }
     if (!strcmp(name, "OSDSYS_video_mode")) {
       if (!strcmp(value, "AUTO"))
         settings.videoMode = 0;
@@ -275,11 +262,11 @@ int loadConfig(void) {
 // Initializes static variables
 void initVariables() {
   // Init ROMVER
-  int fdn = 0;
-  if ((fdn = fioOpen("rom0:ROMVER", FIO_O_RDONLY)) > 0) {
-    fioRead(fdn, settings.romver, 14);
+  int fd = 0;
+  if ((fd = fioOpen("rom0:ROMVER", FIO_O_RDONLY)) >= 0) {
+    fioRead(fd, settings.romver, 14);
     settings.romver[14] = '\0';
-    fioClose(fdn);
+    fioClose(fd);
   }
 }
 
@@ -314,8 +301,7 @@ void initConfig(void) {
     settings.menuItemIdx[i] = 0;
   }
   settings.menuItemCount = 0;
-  strcpy(settings.launcherPath, launcherPath);
-  settings.dkwdrvPath[0] = '\0'; // Can be null
   settings.romver[0] = '\0';
+
   initVariables();
 }

@@ -1,3 +1,4 @@
+#include "defaults.h"
 #include "gs.h"
 #include "init.h"
 #include "patches_common.h"
@@ -21,7 +22,7 @@ PS2_DISABLE_AUTOSTART_PTHREAD();
 
 // Tries to open launcher ELF on both memory cards
 int probeLauncher() {
-  int fd = open(settings.launcherPath, O_RDONLY);
+  int fd = open("pfs0:" HOSD_LAUNCHER_PATH, O_RDONLY);
   if (fd < 0)
     return -1;
 
@@ -36,26 +37,25 @@ int main(int argc, char *argv[]) {
 
   // Load needed modules
   if (initModules())
-    __builtin_trap();
-
-  if (fileXioMount("pfs1:", "hdd0:__sysconf", 0))
-    __builtin_trap();
+    Exit(-1);
 
   // Set FMCB & OSDSYS default settings for configureable items
   initConfig();
 
+  if (fileXioMount("pfs0:", HOSD_CONF_PARTITION, 0))
+    Exit(-1);
+
   // Read config before to check args for an elf to load
   loadConfig();
 
-  // Make sure launcher is accessible
-  if (probeLauncher())
+  fileXioUmount("pfs0:");
+
+  if (fileXioMount("pfs0:", HOSD_SYS_PARTITION, 0))
     Exit(-1);
 
-  if (fileXioUmount("pfs1:"))
-    __builtin_trap();
-
-  if (fileXioMount("pfs0:", "hdd0:__system", 0))
-    __builtin_trap();
+  // Make sure launcher is accessible
+  if (probeLauncher())
+    goto fail;
 
 #ifdef ENABLE_SPLASH
   GSVideoMode vmode = GS_MODE_NTSC; // Use NTSC by default
@@ -73,5 +73,7 @@ int main(int argc, char *argv[]) {
 
   launchOSDSYS();
 
+fail:
+  fileXioUmount("pfs0:");
   Exit(-1);
 }

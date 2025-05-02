@@ -30,4 +30,26 @@ static uint32_t patternOSDSYSDeinit_mask[] = {
     0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xfc000000, 0xffffffff, 0xfc000000, 0xffffffff,
 };
 
+//
+// HDD-OSD patterns
+//
+
+static uint32_t patternSCERemove[] = {
+    0x27bdfff0, // addiu sp,sp,0xFFF0
+    0xffbf0000, // sd    ra,0x0000,sp
+    0x0c000000, // jal   _sceCallCode
+    0x24050006, // addiu a1,zero,0x6
+    0xdfbf0000, // ld    ra,0x0000,sp
+};
+static uint32_t patternSCERemove_mask[] = {0xffffffff, 0xffffffff, 0xfc000000, 0xffffffff, 0xffffffff};
+
+static uint32_t patternSCEUmount[] = {
+    0x27bdfff0, // addiu sp,sp,0xFFF0
+    0xffbf0000, // sd    ra,0x0000,sp
+    0x0c000000, // jal   _sceCallCode
+    0x24050015, // addiu a1,zero,0x15
+    0xdfbf0000, // ld    ra,0x0000,sp
+};
+static uint32_t patternSCEUmount_mask[] = {0xffffffff, 0xffffffff, 0xfc000000, 0xffffffff, 0xffffffff};
+
 #endif
