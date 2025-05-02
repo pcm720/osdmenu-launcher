@@ -13,25 +13,33 @@
 
 // Loads ELF from APA-formatted HDD
 int handlePFS(int argc, char *argv[]) {
-  if ((argv[0] == 0) || (strlen(argv[0]) < 4))
+  if ((argv[0] == 0) || (strlen(argv[0]) < 4)) {
     msg("PFS: invalid argument\n");
+    return -EINVAL;
+  }
 
   // Extract partition from hdd?:<partition>/<path to ELF>
   // Check if the path starts with "hdd?:/" and reject it
   char *path = &argv[0][5];
-  if (path[0] == '/')
+  if (path[0] == '/') {
     msg("PFS: invalid path format\n");
+    return -EINVAL;
+  }
 
-  // Get the first path separator
-  path = strchr(path, '/');
-  if (!path)
+  path = strstr(argv[0], ":pfs:");
+  if (path) {
+    path[0] = '\0';
+    path += 5;
+  } else if ((path = strchr(argv[0], '/'))) {
+    path[0] = '\0';
+    path++;
+  } else {
     msg("PFS: no file path found\n");
+    return -EINVAL;
+  }
 
   // Terminate the path to get partition name in argv[0]
   // and increment to point to the PFS ELF path
-  path[0] = '\0';
-  path++;
-
   int res = initModules(Device_PFS);
   if (res)
     return res;
@@ -60,6 +68,7 @@ int handlePFS(int argc, char *argv[]) {
     return -ENODEV;
 
   // Make sure file exists
+  DPRINTF("Checking for %s\n", elfPath);
   if (tryFile(elfPath)) {
     fileXioDevctl(PFS_MOUNTPOINT, PDIOC_CLOSEALL, NULL, 0, NULL, 0);
     fileXioSync(PFS_MOUNTPOINT, FXIO_WAIT);
@@ -68,6 +77,9 @@ int handlePFS(int argc, char *argv[]) {
   }
 
   // Build the path as 'hdd0:<partition name>:pfs:/<path to ELF>'
+  if (path[0] == '/')
+    path++;
+
   snprintf(elfPath, PATH_MAX - 1, "%s:pfs:/%s", argv[0], path);
   argv[0] = elfPath;
 

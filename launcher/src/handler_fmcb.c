@@ -10,29 +10,77 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define NEWLIB_PORT_AWARE
+#include <fileXio_rpc.h>
+#include <hdd-ioctl.h>
+#include <io_common.h>
+
+#define DELAY_ATTEMPTS 20
+
 // Defined in common/defaults.h
-char cnfPath[] = CONF_PATH;
+char cnfPath[sizeof(CONF_PATH) + 6] = {0};
 
 // Loads ELF specified in OSDMENU.CNF on the memory card
 int handleFMCB(int argc, char *argv[]) {
-  int res = initModules(Device_MemoryCard);
-  if (res)
-    return res;
+  int isHDD = 1;
+  if (!strncmp(argv[0], "pfs", 3))
+    isHDD = 1;
 
-  if (cnfPath[2] == '?')
-    cnfPath[2] = '0';
+  if (!isHDD) {
+    // Handle OSDMenu launch
+    int res = initModules(Device_MemoryCard);
+    if (res)
+      return res;
 
-  // Get memory card slot from argv[0] (fmcb0/1)
-  if (!strncmp("mc0", cnfPath, 3) && (argv[0][4] == '1')) {
-    // If path is fmcb1:, try to get config from mc1 first
-    cnfPath[2] = '1';
-    if (tryFile(cnfPath)) // If file is not found, revert to mc0
-      cnfPath[2] = '0';
+    // Build path to OSDMENU.CNF
+    strcat(cnfPath, "mc0:");
+    strcat(cnfPath, CONF_PATH);
+
+    // Get memory card slot from argv[1] (fmcb0/1)
+    if (argv[1][4] == '1') {
+      // If path is fmcb1:, try to get config from mc1 first
+      cnfPath[2] = '1';
+      if (tryFile(cnfPath)) // If file is not found, revert to mc0
+        cnfPath[2] = '0';
+    }
+  } else {
+    // Handle HOSDMenu launch
+    int res = initModules(Device_PFS);
+    if (res)
+      return res;
+
+    // Wait for IOP to initialize device driver
+    DPRINTF("Waiting for HDD to become available\n");
+    for (int attempts = 0; attempts < DELAY_ATTEMPTS; attempts++) {
+      res = open("hdd0:", O_DIRECTORY | O_RDONLY);
+      if (res >= 0) {
+        close(res);
+        break;
+      }
+      sleep(1);
+    }
+    if (res < 0)
+      return -ENODEV;
+
+    // Mount the partition
+    DPRINTF("Mounting %s to %s\n", HOSD_CONF_PARTITION, PFS_MOUNTPOINT);
+    if (fileXioMount(PFS_MOUNTPOINT, HOSD_CONF_PARTITION, FIO_MT_RDONLY))
+      return -ENODEV;
+
+    // Build path to OSDMENU.CNF
+    strcat(cnfPath, PFS_MOUNTPOINT);
+    strcat(cnfPath, CONF_PATH);
   }
 
-  char *idx = strchr(argv[0], ':');
+  char *idx = strchr(argv[1], ':');
   if (!idx) {
     msg("FMCB: Argument '%s' doesn't contain entry index\n", argv[0]);
+    if (isHDD) {
+      // Unmount the partition
+      fileXioDevctl(PFS_MOUNTPOINT, PDIOC_CLOSEALL, NULL, 0, NULL, 0);
+      fileXioSync(PFS_MOUNTPOINT, FXIO_WAIT);
+      fileXioUmount(PFS_MOUNTPOINT);
+    }
     return -EINVAL;
   }
   int targetIdx = atoi(++idx);
@@ -41,6 +89,12 @@ int handleFMCB(int argc, char *argv[]) {
   FILE *file = fopen(cnfPath, "r");
   if (!file) {
     msg("FMCB: Failed to open %s\n", cnfPath);
+    if (isHDD) {
+      // Unmount the partition
+      fileXioDevctl(PFS_MOUNTPOINT, PDIOC_CLOSEALL, NULL, 0, NULL, 0);
+      fileXioSync(PFS_MOUNTPOINT, FXIO_WAIT);
+      fileXioUmount(PFS_MOUNTPOINT);
+    }
     return -ENOENT;
   }
 
@@ -49,6 +103,11 @@ int handleFMCB(int argc, char *argv[]) {
   int skipPS2LOGO = 0;
   int useDKWDRV = 0;
   char *dkwdrvPath = NULL;
+
+  if (isHDD) {
+    // Set DKWDRV path
+    dkwdrvPath = HOSD_DKWDRV_PATH;
+  }
 
   // Temporary path and argument lists
   linkedStr *targetPaths = NULL;
@@ -119,6 +178,13 @@ int handleFMCB(int argc, char *argv[]) {
     }
   }
   fclose(file);
+
+  if (isHDD) {
+    // Unmount the partition
+    fileXioDevctl(PFS_MOUNTPOINT, PDIOC_CLOSEALL, NULL, 0, NULL, 0);
+    fileXioSync(PFS_MOUNTPOINT, FXIO_WAIT);
+    fileXioUmount(PFS_MOUNTPOINT);
+  }
 
   if (!targetPaths) {
     msg("FMCB: No paths found for entry %d\n", targetIdx);

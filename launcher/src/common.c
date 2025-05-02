@@ -196,7 +196,20 @@ char *normalizePath(char *path, DeviceType type) {
   pathbuffer[0] = '\0';
   switch (type) {
   case Device_PFS:
-    strcat(pathbuffer, PFS_MOUNTPOINT "/");
+    if (!strncmp("hdd", path, 3)) {
+      char *pfsPath = strstr(path, ":pfs:");
+      if (pfsPath) {
+        path = pfsPath + 5;
+      } else {
+        char *pfsPath = strchr(path, '/');
+        if (pfsPath)
+          path = pfsPath;
+      }
+    }
+    if (path[0] == '/')
+      strcat(pathbuffer, PFS_MOUNTPOINT);
+    else
+      strcat(pathbuffer, PFS_MOUNTPOINT "/");
   case Device_MemoryCard:
   case Device_MMCE:
   case Device_CDROM:

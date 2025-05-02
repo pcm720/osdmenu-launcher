@@ -16,7 +16,7 @@ int startCDROM(int displayGameID, int skipPS2LOGO, char *dkwdrvPath);
 
 // handler_fmcb.c
 //
-// Loads ELF specified in OSDMENU.CNF on the memory card
+// Loads ELF specified in OSDMENU.CNF on the memory card or on the APA partition specified in HOSD_CONF_PARTITION
 int handleFMCB(int argc, char *argv[]);
 
 // handler_mc.c

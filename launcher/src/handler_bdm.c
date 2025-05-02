@@ -11,8 +11,10 @@ char bdmMountpoint[] = BDM_MOUNTPOINT;
 
 // Launches ELF from BDM device
 int handleBDM(DeviceType device, int argc, char *argv[]) {
-  if ((argv[0] == 0) || (strlen(argv[0]) < 5))
+  if ((argv[0] == 0) || (strlen(argv[0]) < 5)) {
     msg("BDM: invalid argument\n");
+    return -EINVAL;
+  }
 
   // Build ELF path
   char *elfPath = normalizePath(argv[0], device);
