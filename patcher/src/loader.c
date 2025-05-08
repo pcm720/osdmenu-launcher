@@ -46,9 +46,6 @@ void launchItem(char *item) {
   initModules();
   SifLoadModule("rom0:CLEARSPU", 0, 0);
 
-  FlushCache(0);
-  FlushCache(2);
-
   if (fileXioMount("pfs0:", HOSD_SYS_PARTITION, 0))
     Exit(-1);
 
