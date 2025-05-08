@@ -28,7 +28,7 @@ int handleBDM(DeviceType device, int argc, char *argv[]) {
 
   // Try all BDM devices while decreasing the number of wait
   // attempts for each consecutive device to reduce init times
-  int delayAttempts = 20; // Max number of attempts
+  int delayAttempts = DELAY_ATTEMPTS; // Max number of attempts
   for (int i = 0; i < BDM_MAX_DEVICES; i++) {
     // Build mountpoint path
     bdmMountpoint[4] = i + '0';

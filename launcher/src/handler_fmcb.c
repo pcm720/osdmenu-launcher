@@ -10,23 +10,25 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define NEWLIB_PORT_AWARE
-#include <fileXio_rpc.h>
-#include <hdd-ioctl.h>
-#include <io_common.h>
-
-#define DELAY_ATTEMPTS 20
-
 // Defined in common/defaults.h
 char cnfPath[sizeof(CONF_PATH) + 6] = {0};
 
-// Loads ELF specified in OSDMENU.CNF on the memory card
+// Loads ELF specified in OSDMENU.CNF on the memory card or on the APA partition specified in HOSD_CONF_PARTITION
+// APA-formatted HDD handling requires the path to start with pfs...
 int handleFMCB(int argc, char *argv[]) {
-  int isHDD = 1;
+  int isHDD = 0;
   if (!strncmp(argv[0], "pfs", 3))
     isHDD = 1;
 
-  if (!isHDD) {
+  int res;
+  if (isHDD) {
+    if ((res = initPFS(HOSD_CONF_PARTITION)))
+      return res;
+
+    // Build path to OSDMENU.CNF
+    strcat(cnfPath, PFS_MOUNTPOINT);
+    strcat(cnfPath, CONF_PATH);
+  } else {
     // Handle OSDMenu launch
     int res = initModules(Device_MemoryCard);
     if (res)
@@ -43,44 +45,13 @@ int handleFMCB(int argc, char *argv[]) {
       if (tryFile(cnfPath)) // If file is not found, revert to mc0
         cnfPath[2] = '0';
     }
-  } else {
-    // Handle HOSDMenu launch
-    int res = initModules(Device_PFS);
-    if (res)
-      return res;
-
-    // Wait for IOP to initialize device driver
-    DPRINTF("Waiting for HDD to become available\n");
-    for (int attempts = 0; attempts < DELAY_ATTEMPTS; attempts++) {
-      res = open("hdd0:", O_DIRECTORY | O_RDONLY);
-      if (res >= 0) {
-        close(res);
-        break;
-      }
-      sleep(1);
-    }
-    if (res < 0)
-      return -ENODEV;
-
-    // Mount the partition
-    DPRINTF("Mounting %s to %s\n", HOSD_CONF_PARTITION, PFS_MOUNTPOINT);
-    if (fileXioMount(PFS_MOUNTPOINT, HOSD_CONF_PARTITION, FIO_MT_RDONLY))
-      return -ENODEV;
-
-    // Build path to OSDMENU.CNF
-    strcat(cnfPath, PFS_MOUNTPOINT);
-    strcat(cnfPath, CONF_PATH);
   }
 
   char *idx = strchr(argv[1], ':');
   if (!idx) {
     msg("FMCB: Argument '%s' doesn't contain entry index\n", argv[0]);
-    if (isHDD) {
-      // Unmount the partition
-      fileXioDevctl(PFS_MOUNTPOINT, PDIOC_CLOSEALL, NULL, 0, NULL, 0);
-      fileXioSync(PFS_MOUNTPOINT, FXIO_WAIT);
-      fileXioUmount(PFS_MOUNTPOINT);
-    }
+    if (isHDD)
+      deinitPFS();
     return -EINVAL;
   }
   int targetIdx = atoi(++idx);
@@ -89,12 +60,8 @@ int handleFMCB(int argc, char *argv[]) {
   FILE *file = fopen(cnfPath, "r");
   if (!file) {
     msg("FMCB: Failed to open %s\n", cnfPath);
-    if (isHDD) {
-      // Unmount the partition
-      fileXioDevctl(PFS_MOUNTPOINT, PDIOC_CLOSEALL, NULL, 0, NULL, 0);
-      fileXioSync(PFS_MOUNTPOINT, FXIO_WAIT);
-      fileXioUmount(PFS_MOUNTPOINT);
-    }
+    if (isHDD)
+      deinitPFS();
     return -ENOENT;
   }
 
@@ -104,10 +71,9 @@ int handleFMCB(int argc, char *argv[]) {
   int useDKWDRV = 0;
   char *dkwdrvPath = NULL;
 
-  if (isHDD) {
-    // Set DKWDRV path
+  if (isHDD)
+    // Set DKWDRV path for HOSDMenu
     dkwdrvPath = HOSD_DKWDRV_PATH;
-  }
 
   // Temporary path and argument lists
   linkedStr *targetPaths = NULL;
@@ -179,12 +145,8 @@ int handleFMCB(int argc, char *argv[]) {
   }
   fclose(file);
 
-  if (isHDD) {
-    // Unmount the partition
-    fileXioDevctl(PFS_MOUNTPOINT, PDIOC_CLOSEALL, NULL, 0, NULL, 0);
-    fileXioSync(PFS_MOUNTPOINT, FXIO_WAIT);
-    fileXioUmount(PFS_MOUNTPOINT);
-  }
+  if (isHDD)
+    deinitPFS();
 
   if (!targetPaths) {
     msg("FMCB: No paths found for entry %d\n", targetIdx);
