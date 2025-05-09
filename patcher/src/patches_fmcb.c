@@ -86,8 +86,12 @@ void patchMenu(uint8_t *osd) {
     if (!ptr)
       return;
 
-    // Found if the current address points to the pointer to "Browser" string
+// Found if the current address points to the pointer to "Browser" string
+#ifndef HOSD
     if (_lw((uint32_t)ptr + 4) == (uint32_t)ptr - 4 * 4)
+#else
+    if (_lw((uint32_t)ptr + 4) == (uint32_t)ptr - 8 * 4)
+#endif
       break;
   }
   menuAddr = (uint32_t)ptr;
@@ -122,11 +126,20 @@ void patchMenu(uint8_t *osd) {
   _sw(tmp, entryAddr + 3 * 4);           // lw     a0, $xxxx(v0)
   _sw(0x1040000a, entryAddr + 4 * 4);    // beq    v0, zero, exit
 
-  // Build the OSD menu
+// Build the OSD menu
+#ifndef HOSD
   osdMenu[0] = _lw(menuAddr - 4 * 4); // "Browser"
   osdMenu[1] = _lw(menuAddr - 3 * 4);
   osdMenu[2] = _lw(menuAddr - 2 * 4); // "System Configuration"
   osdMenu[3] = _lw(menuAddr - 1 * 4);
+#else
+  // HDD-OSD uses four values per entry, but
+  // patchDrawMenu fixes this to two values per entry
+  osdMenu[0] = _lw(menuAddr - 8 * 4); // "Browser" string index
+  osdMenu[1] = _lw(menuAddr - 7 * 4);
+  osdMenu[2] = _lw(menuAddr - 4 * 4); // "System Configuration" string index
+  osdMenu[3] = _lw(menuAddr - 3 * 4);
+#endif
 
   for (i = 0; i < settings.menuItemCount; i++) {
     osdMenu[4 + i * 2] = OSD_MAGIC + i;
@@ -151,6 +164,10 @@ static int fontHeight = 16;
 
 // Draws selected items
 void drawMenuItemSelected(int X, int Y, uint32_t *color, int alpha, const char *string, int num) {
+#ifdef HOSD
+  asm volatile("move %0, $s1" : "=r"(num)::); // For HDD-OSD, get menu index from s1 register
+  num *= 8;                                   // Multiply by 8 to align with OSDSYS behavior
+#endif
   int i;
 
   for (i = 0; i < 4; i++)
@@ -191,6 +208,10 @@ void drawMenuItemSelected(int X, int Y, uint32_t *color, int alpha, const char *
 
 // Draws unselected items
 void drawMenuItemUnselected(int X, int Y, uint32_t *color, int alpha, const char *string, int num) {
+#ifdef HOSD
+  asm volatile("move %0, $s1" : "=r"(num)::); // For HDD-OSD, get menu index from s1 register
+  num *= 8;                                   // Multiply by 8 to align with OSDSYS behavior
+#endif
   int i;
 
   for (i = 0; i < 4; i++)
@@ -259,7 +280,11 @@ void patchMenuDraw(uint8_t *osd) {
   pSelItem = (uint32_t)ptr; // code for selected menu item
 
   ptr = findPatternWithMask(ptr + 4, 256, (uint8_t *)patternDrawMenuItem, (uint8_t *)patternDrawMenuItem_mask, sizeof(patternDrawMenuItem));
+#ifndef HOSD
   if (ptr != (uint8_t *)(pSelItem + 48))
+#else
+  if (ptr != (uint8_t *)(pSelItem + 44))
+#endif
     return;
   pUnselItem = (uint32_t)ptr; // code for unselected menu item
 
@@ -277,15 +302,24 @@ void patchMenuDraw(uint8_t *osd) {
   tmp |= ((uint32_t)drawMenuItemUnselected >> 2);
   _sw(tmp, pUnselItem + 32); // overwrite the function call for unselected item
 
+#ifndef HOSD
   _sw(0x001048c0, pSelItem);       // make menu item's number the sixth param
   _sw(0x01231021, pSelItem + 4);   // by loading it into t1 (multiplied by 8):
   _sw(0x001048c0, pUnselItem);     // sll   t1, s0, 3
   _sw(0x01231021, pUnselItem + 4); // addu  v0, t1, v1
+#else
+  // HDD-OSD uses four values per menu entry
+  // Adjust this behavior to match OSDSYS (two values per entry)
+  // by changing the instruction that increments the string index.
+  tmp = _lw(pUnselItem + 48); // Must be addiu ??,??,0x10
+  if ((tmp & 0xff0000ff) == 0x26000010)
+    _sw((tmp & 0xffffff00) | 0x08, pUnselItem + 48); // Modify to addiu ??,??,0x08
+#endif
 }
 
 static void (*DrawNonSelectableItem)(int X, int Y, uint32_t *color, int alpha, const char *string);
 static void (*DrawIcon)(int type, int X, int Y, int alpha);
-static void (*DrawButtonPanel_1stfunc)(void);
+static void (*DrawButtonPanelGetOSDLang)(void);
 
 int ButtonsPanel_Type = 0;
 
@@ -300,7 +334,7 @@ void getButtonsPanelType(int type) {
   ButtonsPanel_Type = type;
 
   // Call original function that was overridden
-  DrawButtonPanel_1stfunc();
+  DrawButtonPanelGetOSDLang();
 }
 
 // drawNonselectableEntryLeft() is called for all items less the last
@@ -312,7 +346,12 @@ void drawNonselectableEntryLeft(int X, int Y, uint32_t *color, int alpha, const 
     if (settings.enterY == -1)
       settings.enterY = Y;
 
+#ifndef HOSD
     DrawNonSelectableItem(settings.enterX + 28, settings.enterY, color, alpha, string);
+#else
+    // Adding 1 to Y offset to align text with the icon
+    DrawNonSelectableItem(settings.enterX + 28, settings.enterY + 1, color, alpha, string);
+#endif
   } else
     DrawNonSelectableItem(X, Y, color, alpha, string);
 }
@@ -326,7 +365,12 @@ void drawNonselectableEntryRight(int X, int Y, uint32_t *color, int alpha, const
     if (settings.versionY == -1)
       settings.versionY = Y;
 
+#ifndef HOSD
     DrawNonSelectableItem(settings.versionX + 28, settings.versionY, color, alpha, string);
+#else
+    // Adding 1 to Y offset to align text with the icon
+    DrawNonSelectableItem(settings.versionX + 28, settings.versionY + 1, color, alpha, string);
+#endif
   } else
     DrawNonSelectableItem(X, Y, color, alpha, string);
 }
@@ -388,7 +432,7 @@ void patchMenuButtonPanel(uint8_t *osd) {
   tmp = _lw(pButtonsPanelType + 32);
   tmp &= 0x03ffffff;
   tmp <<= 2;
-  DrawButtonPanel_1stfunc = (void *)tmp; // get original function call
+  DrawButtonPanelGetOSDLang = (void *)tmp; // get original function call
 
   tmp = 0x0c000000;
   tmp |= ((uint32_t)getButtonsPanelType >> 2);
@@ -468,6 +512,17 @@ void patchMenuButtonPanel(uint8_t *osd) {
 //    do_nothing,				    // none (return 1)
 //    exec_hdd_stuff			  // HDDLOAD
 //}
+// HDD-OSD:
+// uint32_t *discLaunchHandlers[8] = {
+//    exec_ps2_game_disc,		// PS2 game DVD
+//    exec_ps2_game_disc,		// PS2 game CD
+//    exec_ps1_game_disc,		// PS1 game CD
+//    exec_dvdv_disc,			  // DVD Video
+//    do_nothing,				    // none (return 1)
+//    do_nothing,				    // none (return 1)
+//    exec_hdd_stuff			  // HDDLOAD
+//    exec_hdd_app          // Execute HDD application
+//}
 // Patches the disc launch handlers to load discs with the launcher
 void patchDiscLaunch(uint8_t *osd) {
   uint8_t *ptr;
@@ -489,28 +544,32 @@ void patchDiscLaunch(uint8_t *osd) {
   discLaunchHandlers[2] = (uint32_t)launchDisc; // Overwrite PS1 function pointer
 }
 
-// Patches automatic disc launch
+// Patches automatic disc launch for OSDMenu
 void patchSkipDisc(uint8_t *osd) {
-  uint8_t *ptr;
-  uint32_t tmp, addr2, addr3, dist;
-
-  ptr = findPatternWithMask(osd, 0x100000, (uint8_t *)patternDetectDisc_1, (uint8_t *)patternDetectDisc_1_mask, sizeof(patternDetectDisc_1));
-  if (!ptr)
+  uint8_t *ptr1 = findPatternWithMask(osd, 0x100000, (uint8_t *)patternDetectDisc, (uint8_t *)patternDetectDisc_mask, sizeof(patternDetectDisc));
+  if (!ptr1)
     return;
-  addr2 = (uint32_t)ptr;
 
-  ptr = findPatternWithMask(osd, 0x100000, (uint8_t *)patternDetectDisc_2, (uint8_t *)patternDetectDisc_2_mask, sizeof(patternDetectDisc_2));
-  if (!ptr)
+  uint8_t *ptr2 = findPatternWithMask(osd, 0x100000, (uint8_t *)patternDetectDisc_Clock, (uint8_t *)patternDetectDisc_Clock_mask,
+                                      sizeof(patternDetectDisc_Clock));
+  if (!ptr2)
     return;
-  addr3 = (uint32_t)ptr;
 
-  tmp = addr2 + 48; // patch start
-  dist = ((addr3 - tmp) >> 2) - 1;
+#ifndef HOSD
+  uint32_t tmp = (uint32_t)ptr1 + 48; // patch start
+  uint32_t dist = (((uint32_t)ptr2 - tmp) >> 2) - 1;
   if (dist > 0x40)
     return;
 
-  _sw(0x10000000 + dist, tmp); // branch to addr3
+  _sw(0x10000000 + dist, tmp); // branch to ptr2
   _sw(0, tmp + 4);             // nop
+#else
+  // NOP out the jump tables
+  for (uint32_t i = 0; i < (sizeof(patternDetectDisc) / sizeof(uint32_t)); i++)
+    _sw(0, (uint32_t)ptr1 + i * 4);
+  for (uint32_t i = 0; i < (sizeof(patternDetectDisc_Clock) / sizeof(uint32_t)); i++)
+    _sw(0, (uint32_t)ptr2 + i * 4);
+#endif
 }
 
 static uint32_t menuLoopPatch_1[7] = {0x8e04fff8, 0x8e05fff0, 0x0004102a, 0x0082280b, 0x20a3ffff, 0x1000000c, 0xae03fff8};
@@ -524,10 +583,12 @@ void patchMenuInfiniteScrolling(uint8_t *osd, int isProtokernel) {
   uint8_t *ptr;
   uint32_t *addr, *src, *dst;
 
+#ifndef HOSD
   if (isProtokernel)
     ptr = findPatternWithMask(osd + PROTOKERNEL_MENU_OFFSET, 0x100000, (uint8_t *)patternMenuLoop_Proto, (uint8_t *)patternMenuLoop_mask,
                               sizeof(patternMenuLoop_Proto));
   else
+#endif
     ptr = findPatternWithMask(osd, 0x100000, (uint8_t *)patternMenuLoop, (uint8_t *)patternMenuLoop_mask, sizeof(patternMenuLoop));
 
   if (!ptr)
@@ -535,7 +596,12 @@ void patchMenuInfiniteScrolling(uint8_t *osd, int isProtokernel) {
 
   addr = (uint32_t *)ptr;
 
-  if (addr[9] == 0x30624000 && addr[20] == 0x24045200) {
+#ifndef HOSD
+  if (addr[9] == 0x30624000 && addr[20] == 0x24045200)
+#else
+  if (addr[9] == 0x30624000 && addr[20] == 0x24046300)
+#endif
+  {
     src = menuLoopPatch_1;
     dst = addr + 2;
     for (i = 0; i < 7; i++)
@@ -565,6 +631,7 @@ void patchVideoMode(uint8_t *osd, GSVideoMode mode) {
     _sw(0x0000102d, (uint32_t)ptr + 20); // set return value to 0 to force NTSC
 }
 
+#ifndef HOSD
 // Patches HDD update code for ROMs not supporting "SkipHdd" arg
 void patchSkipHDD(uint8_t *osd) {
   uint8_t *ptr;
@@ -769,3 +836,4 @@ void patchMenuButtonPanelProtokernel(uint8_t *osd) {
   tmp <<= 2;
   DrawNonSelectableItem = (void *)tmp;
 }
+#endif

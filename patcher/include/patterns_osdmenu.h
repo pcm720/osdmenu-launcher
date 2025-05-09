@@ -1,8 +1,9 @@
 #ifndef _PATTERNS_OSDMENU_H_
 #define _PATTERNS_OSDMENU_H_
-// Additional patch patterns for osdmenu-launcher
+// OSDMenu patterns
 #include <stdint.h>
 
+#ifndef HOSD
 // Pattern for injecting custom entries into the Version submenu
 static uint32_t patternVersionInit[] = {
     // Search pattern in the OSD pad handler table (at address 0x208800 for ROMVER 0200E20040614):
@@ -25,6 +26,18 @@ static uint32_t patternVersionStringTable[] = {
     0x34630000, // ori  v1,v1, <bottom address bytes>
 };
 static uint32_t patternVersionStringTable_mask[] = {0xffff0000, 0x00000018, 0xffff0000};
+#else
+// Pattern for injecting custom entries into the Version submenu
+static uint32_t patternVersionInit[] = {
+    0x0c000000, // jal   initVersionInfoStrings
+    0x26300000, // addiu s0,s1,0x????
+    0x10000003, // beq   zero,zero,0x0003
+};
+static uint32_t patternVersionInit_mask[] = {0xfc000000, 0xffff0000, 0xffffffff};
+
+// Using fixed offset to avoid unneeded tracing
+uint32_t hddosdVerinfoStringTableAddr = 0x1f1298;
+#endif
 
 // Pattern for getting the address of the sceGsGetGParam function
 static uint32_t patternGsGetGParam[] = {
@@ -68,6 +81,9 @@ static uint32_t patternCdApplySCmd[] = {
     0x0c000000, // jal sceCdSyncS
 };
 static uint32_t patternCdApplySCmd_mask[] = {0xfc000000, 0x00000000, 0xfc000000, 0xfc00ffff, 0x00000000, 0xfc000000};
+
+#ifndef HOSD
+// OSDMenu patterns
 
 // Pattern for getting the address of the Browser file properties/Copy/Delete view init function
 // Seems to be consistent across all ROM versions, including protokernels
@@ -130,5 +146,34 @@ static uint32_t patternCdApplySCmd_Proto[] = {
     0x0000302d, // daddu a2,zero,zero
 };
 static uint32_t patternCdApplySCmd_Proto_mask[] = {0xffff0000, 0xffffffff, 0xffffffff, 0xffffffff, 0xfc000000, 0xffffffff};
+#else
+// HOSDMenu patterns
+
+// Pattern for getting the address of the function related to filling the browser icon properties
+static uint32_t patternBuildIconData[] = {
+    0xacc00690, // sw zero,0x0690,a2
+    0x0c000000, // jal buildIconData
+    0xacc00694, // sw zero,0x0694,a2
+};
+static uint32_t patternBuildIconData_mask[] = {0xffffffff, 0xfc000000, 0xffffffff};
+
+// Pattern for geting the address of the exit from browser function
+static uint32_t patternExitToPreviousModule[] = {
+    0x8f820000, // sw zero,0x0690,a2
+    0x14000000, // bne ??, ??, ??
+    0x00000000, // nop
+    0x0c000000, // jal exitToPreviousModule
+    0x00000000, // nop
+};
+static uint32_t patternExitToPreviousModule_mask[] = {0xffff0000, 0xff000000, 0xffffffff, 0xfc000000, 0xffffffff};
+
+// Pattern for geting the address of the function that sets up data for main menu, used to launch CD/DVD or HDD applications
+// When this function is called, $s2 register contains the address of the currently selected entry icon data
+static uint32_t patternSetupExitToPreviousModule[] = {
+    0x0c000000, // jal setupExitToPreviousModule
+    0x8e000694, // lw zero,0x0694,??
+};
+static uint32_t patternSetupExitToPreviousModule_mask[] = {0xfc000000, 0xff00ffff};
+#endif
 
 #endif

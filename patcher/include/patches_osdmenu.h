@@ -1,6 +1,6 @@
 #ifndef _PATCHES_OSDMENU_H_
 #define _PATCHES_OSDMENU_H_
-// Additional patch patterns for osdmenu-launcher
+// OSDMenu patches
 #include "gs.h"
 #include <stdint.h>
 
@@ -18,6 +18,7 @@ void restoreGSVideoMode();
 // Browser application launch patch
 void patchBrowserApplicationLaunch(uint8_t *osd, int isProtokernel);
 
+#ifndef HOSD
 // Protokernel patches
 
 // Extends version menu with custom entries
@@ -25,5 +26,11 @@ void patchVersionInfoProtokernel(uint8_t *osd);
 
 // Overrides SetGsCrt and sceGsPutDispEnv functions to support 480p and 1080i output modes
 void patchGSVideoModeProtokernel(uint8_t *osd, GSVideoMode outputMode);
+#else
+// HDD-OSD patches
+
+// Patches newer 48-bit capable atad driver into HDD-OSD
+void patchATAD();
+#endif
 
 #endif

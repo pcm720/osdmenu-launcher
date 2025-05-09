@@ -1,3 +1,4 @@
+#include "defaults.h"
 #include "gs.h"
 #include "init.h"
 #include "patches_common.h"
@@ -8,7 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 #define NEWLIB_PORT_AWARE
-#include <fileio.h>
 
 // Reduce binary size by disabling the unneeded functionality
 void _libcglue_init() {}
@@ -17,6 +17,11 @@ void _libcglue_args_parse(int argc, char **argv) {}
 DISABLE_PATCHED_FUNCTIONS();
 DISABLE_EXTRA_TIMERS_FUNCTIONS();
 PS2_DISABLE_AUTOSTART_PTHREAD();
+
+#ifndef HOSD
+// OSDMenu
+
+#include <fileio.h>
 
 // Tries to open launcher ELF on both memory cards
 int probeLauncher() {
@@ -49,7 +54,7 @@ int main(int argc, char *argv[]) {
   // Load needed modules
   initModules();
 
-  // Set FMCB & OSDSYS default settings for configureable items
+  // Set FMCB & OSDSYS default settings for configurable items
   initConfig();
 
   // Determine from which mc slot FMCB was booted
@@ -58,7 +63,7 @@ int main(int argc, char *argv[]) {
   else if (!strncmp(argv[0], "mc1", 3))
     settings.mcSlot = 1;
 
-  // Read config before to check args for an elf to load
+  // Read config file
   loadConfig();
 
   // Make sure launcher is accessible
@@ -89,3 +94,67 @@ int main(int argc, char *argv[]) {
 
   Exit(-1);
 }
+#else
+// HOSDMenu
+
+#include <fcntl.h>
+#include <fileXio_rpc.h>
+
+// Tries to open launcher ELF on both memory cards
+int probeLauncher() {
+  int fd = open("pfs0:" HOSD_LAUNCHER_PATH, O_RDONLY);
+  if (fd < 0)
+    return -1;
+
+  close(fd);
+
+  return 0;
+}
+
+int main(int argc, char *argv[]) {
+  // Clear memory
+  wipeUserMem();
+
+  // Load needed modules
+  if (initModules())
+    Exit(-1);
+
+  // Set FMCB & OSDSYS default settings for configurable items
+  initConfig();
+
+  if (fileXioMount("pfs0:", HOSD_CONF_PARTITION, 0))
+    Exit(-1);
+
+  // Read config file
+  loadConfig();
+
+  fileXioUmount("pfs0:");
+
+  if (fileXioMount("pfs0:", HOSD_SYS_PARTITION, 0))
+    Exit(-1);
+
+  // Make sure launcher is accessible
+  if (probeLauncher())
+    goto fail;
+
+#ifdef ENABLE_SPLASH
+  GSVideoMode vmode = GS_MODE_NTSC; // Use NTSC by default
+
+  // Respect preferred mode
+  if (!settings.videoMode) {
+    // If mode is not set, read console region from ROM
+    if (settings.romver[4] == 'E')
+      vmode = GS_MODE_PAL;
+  } else if (settings.videoMode == GS_MODE_PAL)
+    vmode = GS_MODE_PAL;
+
+  gsDisplaySplash(vmode);
+#endif
+
+  launchOSDSYS();
+
+fail:
+  fileXioUmount("pfs0:");
+  Exit(-1);
+}
+#endif

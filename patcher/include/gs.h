@@ -14,6 +14,15 @@ typedef enum {
   GS_MODE_DTV_1080I
 } GSVideoMode;
 
+// Resets and initializes GS
+int gsInit(GSVideoMode vmode);
+
+// Draws black rectangle
+void gsClearScreen();
+
+// Transfers raw bitmap image to GS' memory and draws it on screen at specified coordinates
+void gsPrintBitmap(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint32_t *data);
+
 //---------------------------------------------------------------------------
 // GS_PACKET macros
 //---------------------------------------------------------------------------

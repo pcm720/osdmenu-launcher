@@ -40,11 +40,13 @@ typedef struct {
   char menuDelimiterTop[NAME_LEN];           // The top menu delimiter text, only for scroll menu
   char menuDelimiterBottom[NAME_LEN];        // The bottom menu delimiter text, only for scroll menu
   char menuItemName[CUSTOM_ITEMS][NAME_LEN]; // Menu items text
-  char launcherPath[50];                     // Path to launcher ELF
-  char dkwdrvPath[50];                       // Path to DKWDRV
-  char romver[15];                           // ROMVER string, initialized before patching
-  uint8_t mcSlot;                            // Memory card slot contaning currently loaded OSDMENU.CNF
-  GSVideoMode videoMode;                     // OSDSYS Video mode (0 for auto)
+#ifndef HOSD
+  char launcherPath[50]; // Path to launcher ELF
+  char dkwdrvPath[50];   // Path to DKWDRV
+#endif
+  char romver[15];       // ROMVER string, initialized before patching
+  uint8_t mcSlot;        // Memory card slot contaning currently loaded OSDMENU.CNF
+  GSVideoMode videoMode; // OSDSYS Video mode (0 for auto)
 } PatcherSettings;
 
 // Stores patcher settings and OSDSYS menu items

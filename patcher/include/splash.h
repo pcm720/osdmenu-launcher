@@ -5,7 +5,4 @@
 // Initializes GS and displays FMCB splash screen
 void gsDisplaySplash();
 
-// Resets and initializes GS
-int gsInit(GSVideoMode vmode);
-
 #endif
