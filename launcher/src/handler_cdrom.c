@@ -62,26 +62,10 @@ int handleCDROM(int argc, char *argv[]) {
 }
 
 int startCDROM(int displayGameID, int skipPS2LOGO, char *dkwdrvPath) {
+  // Always reset IOP to a known state
   int res = initModules(Device_MemoryCard);
   if (res)
     return res;
-
-  if (dkwdrvPath) {
-    if (strncmp(dkwdrvPath, "mc", 2)) {
-      msg("CDROM ERROR: only memory cards are supported for DKWDRV\n");
-      return -ENOENT;
-    }
-
-    // Find DKWDRV path
-    for (int i = '0'; i < '2'; i++) {
-      dkwdrvPath[2] = i;
-      if (!tryFile(dkwdrvPath))
-        goto dkwdrvFound;
-    }
-    msg("CDROM ERROR: Failed to find DKWDRV at %s\n", dkwdrvPath);
-    return -ENOENT;
-  dkwdrvFound:
-  }
 
   if (!sceCdInit(SCECdINIT)) {
     msg("CDROM ERROR: Failed to initialize libcdvd\n");
@@ -149,7 +133,7 @@ int startCDROM(int displayGameID, int skipPS2LOGO, char *dkwdrvPath) {
       free(titleID);
       free(titleVersion);
       char *argv[] = {dkwdrvPath};
-      LoadELFFromFile(1, argv);
+      launchPath(1, argv);
     } else {
       char *argv[] = {titleID, titleVersion};
       DPRINTF("Starting PS1DRV with title ID %s and version %s\n", argv[0], argv[1]);

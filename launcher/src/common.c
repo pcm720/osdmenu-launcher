@@ -9,6 +9,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#define NEWLIB_PORT_AWARE
+#include <fileXio_rpc.h>
+#include <hdd-ioctl.h>
+#include <io_common.h>
 
 static int isScreenInited = 0;
 char pathbuffer[PATH_MAX];
@@ -196,7 +200,20 @@ char *normalizePath(char *path, DeviceType type) {
   pathbuffer[0] = '\0';
   switch (type) {
   case Device_PFS:
-    strcat(pathbuffer, PFS_MOUNTPOINT "/");
+    if (!strncmp("hdd", path, 3)) {
+      char *pfsPath = strstr(path, ":pfs:");
+      if (pfsPath) {
+        path = pfsPath + 5;
+      } else {
+        char *pfsPath = strchr(path, '/');
+        if (pfsPath)
+          path = pfsPath;
+      }
+    }
+    if (path[0] == '/')
+      strcat(pathbuffer, PFS_MOUNTPOINT);
+    else
+      strcat(pathbuffer, PFS_MOUNTPOINT "/");
   case Device_MemoryCard:
   case Device_MMCE:
   case Device_CDROM:
@@ -222,3 +239,52 @@ char *normalizePath(char *path, DeviceType type) {
   }
   return pathbuffer;
 }
+
+#ifdef APA
+// Initializes APA-formatted HDD and mounts the partition
+int initPFS(char *path) {
+  int res;
+  // Reset IOP
+  if ((res = initModules(Device_PFS)))
+    return res;
+
+  // Wait for IOP to initialize device driver
+  DPRINTF("Waiting for HDD to become available\n");
+  for (int attempts = 0; attempts < DELAY_ATTEMPTS; attempts++) {
+    res = open("hdd0:", O_DIRECTORY | O_RDONLY);
+    if (res >= 0) {
+      close(res);
+      break;
+    }
+    sleep(1);
+  }
+  if (res < 0)
+    return -ENODEV;
+
+  // Extract partition path
+  char *filePath = strstr(path, ":pfs:");
+  char pathSeparator = '\0';
+  if (filePath || (filePath = strchr(path, '/'))) {
+    // Terminate the partition path
+    pathSeparator = filePath[0];
+    filePath[0] = '\0';
+  }
+
+  // Mount the partition
+  DPRINTF("Mounting %s to %s\n", path, PFS_MOUNTPOINT);
+  res = fileXioMount(PFS_MOUNTPOINT, path, FIO_MT_RDONLY);
+  if (pathSeparator != '\0')
+    filePath[0] = pathSeparator; // Restore the path
+  if (res)
+    return -ENODEV;
+
+  return 0;
+}
+
+// Unmounts the partition
+void deinitPFS() {
+  fileXioDevctl(PFS_MOUNTPOINT, PDIOC_CLOSEALL, NULL, 0, NULL, 0);
+  fileXioSync(PFS_MOUNTPOINT, FXIO_WAIT);
+  fileXioUmount(PFS_MOUNTPOINT);
+}
+#endif

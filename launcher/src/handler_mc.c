@@ -7,8 +7,10 @@
 
 // Launches ELF from memory cards
 int handleMC(int argc, char *argv[]) {
-  if ((argv[0] == 0) || (strlen(argv[0]) < 4))
+  if ((argv[0] == 0) || (strlen(argv[0]) < 4)) {
     msg("MC: invalid argument\n");
+    return -EINVAL;
+  }
 
   int res = initModules(Device_MemoryCard);
   if (res)
@@ -32,8 +34,10 @@ int handleMC(int argc, char *argv[]) {
 
 // Launches ELF from MMCE devices
 int handleMMCE(int argc, char *argv[]) {
-  if ((argv[0] == 0) || (strlen(argv[0]) < 5))
+  if ((argv[0] == 0) || (strlen(argv[0]) < 5)) {
     msg("MMCE: invalid argument\n");
+    return -EINVAL;
+  }
 
   int res = initModules(Device_MMCE);
   if (res)
