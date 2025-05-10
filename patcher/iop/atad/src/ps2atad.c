@@ -709,7 +709,6 @@ int ata_device_sec_set_password(int device, void *password) {
 
 /* Export 11 */
 int ata_device_sec_unlock(int device, void *password) {
-  return 0;
   ata_devinfo_t *devinfo = atad_devinfo;
   u16 *param = ata_param;
   int res;
@@ -858,7 +857,8 @@ static int ata_init_devices(ata_devinfo_t *devinfo) {
       lba_48bit[i] = 1;
       /* I don't think anyone would use a >2TB HDD but just in case.  */
       if (ata_param[ATA_ID_48BIT_SECTOTAL_HI]) {
-        devinfo[i].total_sectors = 0xffffffff;
+        // Limit to 0x7fffffff to work around HDD-OSD treating this number as a signed value
+        devinfo[i].total_sectors = 0x7fffffff;
       } else {
         devinfo[i].total_sectors = (ata_param[ATA_ID_48BIT_SECTOTAL_MI] << 16) | ata_param[ATA_ID_48BIT_SECTOTAL_LO];
       }
