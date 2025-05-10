@@ -37,7 +37,7 @@
 
 // Path to HDD-OSD ELF relative to HOSD_SYS_PARTITION partition root
 #ifndef HOSD_HDDOSD_PATH
-#define HOSD_HDDOSD_PATH "/osd100/hosdsys.elf"
+#define HOSD_HDDOSD_PATH "/osd100/OSDSYS_A.XLF"
 #endif
 
 // Path to launcher.elf relative to HOSD_SYS_PARTITION partition root
