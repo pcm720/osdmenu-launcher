@@ -14,7 +14,7 @@ void _libcglue_rtc_update() {}
 PS2_DISABLE_AUTOSTART_PTHREAD();
 
 int main(int argc, char *argv[]) {
-  if (argc < 2)
+  if ((argc < 2) || (argv[1][0] == '\0')) // argv[1] can be empty when launched from OPL
     // Try to quickboot with paths from .CNF located at the current working directory
     fail("Quickboot failed: %d", handleQuickboot(argv[0]));
 

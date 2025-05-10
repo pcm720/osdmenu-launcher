@@ -3,7 +3,7 @@
 
 #include <debug.h>
 
-#define BDM_MOUNTPOINT "mass?:"
+#define BDM_MOUNTPOINT "mass0:"
 #define PFS_MOUNTPOINT "pfs0:"
 #define DELAY_ATTEMPTS 20
 

@@ -50,11 +50,15 @@ int handleQuickboot(char *cnfPath) {
 
   DPRINTF("Opening %s\n", cnfPath);
   FILE *file = fopen(cnfPath, "r");
-  if (!file) {
-    msg("Quickboot: Failed to open %s\n", cnfPath);
-    if (isHDD)
-      deinitPFS();
-    return -ENODEV;
+  int delayAttempts = DELAY_ATTEMPTS; // Max number of attempts
+  while (!file) {
+    sleep(1);
+    delayAttempts--;
+    if (delayAttempts < 0) {
+      msg("Quickboot: Failed to open %s\n", cnfPath);
+      return -ENODEV;
+    }
+    file = fopen(cnfPath, "r");
   }
 
   // Temporary path and argument lists

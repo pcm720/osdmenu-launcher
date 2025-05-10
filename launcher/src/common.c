@@ -225,6 +225,7 @@ char *normalizePath(char *path, DeviceType type) {
   case Device_MX4SIO:
   case Device_iLink:
   case Device_UDPBD:
+    char devNumber = path[4];
     // Get relative ELF path from argv[0]
     path = strchr(path, ':');
     if (!path)
@@ -233,7 +234,13 @@ char *normalizePath(char *path, DeviceType type) {
     path++;
 
     strcpy(pathbuffer, BDM_MOUNTPOINT);
-    strncat(pathbuffer, path, PATH_MAX - sizeof(BDM_MOUNTPOINT));
+    if ((devNumber > '0') && (devNumber <= '9'))
+      pathbuffer[4] = devNumber;
+
+    if (path[0] != '/')
+      strcat(pathbuffer, "/");
+    strncat(pathbuffer, path, PATH_MAX - sizeof(BDM_MOUNTPOINT) - 1);
+    break;
   default:
     return NULL;
   }
