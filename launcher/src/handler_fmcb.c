@@ -11,28 +11,46 @@
 #include <string.h>
 
 // Defined in common/defaults.h
-char cnfPath[] = CONF_PATH;
+char cnfPath[sizeof(CONF_PATH) + 6] = {0};
 
-// Loads ELF specified in OSDMENU.CNF on the memory card
+// Loads ELF specified in OSDMENU.CNF on the memory card or on the APA partition specified in HOSD_CONF_PARTITION
+// APA-formatted HDD handling requires the path to start with pfs...
 int handleFMCB(int argc, char *argv[]) {
-  int res = initModules(Device_MemoryCard);
-  if (res)
-    return res;
+  int isHDD = 0;
+  if (!strncmp(argv[0], "pfs", 3))
+    isHDD = 1;
 
-  if (cnfPath[2] == '?')
-    cnfPath[2] = '0';
+  int res;
+  if (isHDD) {
+    if ((res = initPFS(HOSD_CONF_PARTITION)))
+      return res;
 
-  // Get memory card slot from argv[0] (fmcb0/1)
-  if (!strncmp("mc0", cnfPath, 3) && (argv[0][4] == '1')) {
-    // If path is fmcb1:, try to get config from mc1 first
-    cnfPath[2] = '1';
-    if (tryFile(cnfPath)) // If file is not found, revert to mc0
-      cnfPath[2] = '0';
+    // Build path to OSDMENU.CNF
+    strcat(cnfPath, PFS_MOUNTPOINT);
+    strcat(cnfPath, HOSD_CONF_PATH);
+  } else {
+    // Handle OSDMenu launch
+    int res = initModules(Device_MemoryCard);
+    if (res)
+      return res;
+
+    // Build path to OSDMENU.CNF
+    strcpy(cnfPath, CONF_PATH);
+
+    // Get memory card slot from argv[1] (fmcb0/1)
+    if (argv[1][4] == '1') {
+      // If path is fmcb1:, try to get config from mc1 first
+      cnfPath[2] = '1';
+      if (tryFile(cnfPath)) // If file is not found, revert to mc0
+        cnfPath[2] = '0';
+    }
   }
 
-  char *idx = strchr(argv[0], ':');
+  char *idx = strchr(argv[1], ':');
   if (!idx) {
     msg("FMCB: Argument '%s' doesn't contain entry index\n", argv[0]);
+    if (isHDD)
+      deinitPFS();
     return -EINVAL;
   }
   int targetIdx = atoi(++idx);
@@ -41,6 +59,8 @@ int handleFMCB(int argc, char *argv[]) {
   FILE *file = fopen(cnfPath, "r");
   if (!file) {
     msg("FMCB: Failed to open %s\n", cnfPath);
+    if (isHDD)
+      deinitPFS();
     return -ENOENT;
   }
 
@@ -49,6 +69,10 @@ int handleFMCB(int argc, char *argv[]) {
   int skipPS2LOGO = 0;
   int useDKWDRV = 0;
   char *dkwdrvPath = NULL;
+
+  if (isHDD)
+    // Set DKWDRV path for HOSDMenu
+    dkwdrvPath = HOSD_DKWDRV_PATH;
 
   // Temporary path and argument lists
   linkedStr *targetPaths = NULL;
@@ -119,6 +143,9 @@ int handleFMCB(int argc, char *argv[]) {
     }
   }
   fclose(file);
+
+  if (isHDD)
+    deinitPFS();
 
   if (!targetPaths) {
     msg("FMCB: No paths found for entry %d\n", targetIdx);

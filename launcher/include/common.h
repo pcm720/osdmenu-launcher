@@ -3,8 +3,9 @@
 
 #include <debug.h>
 
-#define BDM_MOUNTPOINT "mass?:"
+#define BDM_MOUNTPOINT "mass0:"
 #define PFS_MOUNTPOINT "pfs0:"
+#define DELAY_ATTEMPTS 20
 
 // Enum for supported devices
 typedef enum {
@@ -58,6 +59,12 @@ linkedStr *addStr(linkedStr *lstr, char *str);
 
 // Frees all elements of linkedStr
 void freeLinkedStr(linkedStr *lstr);
+
+// Initializes APA-formatted HDD and mounts the partition
+int initPFS(char *path);
+
+// Unmounts the partition
+void deinitPFS();
 
 #ifdef ENABLE_PRINTF
     #define DPRINTF(x...) printf(x)

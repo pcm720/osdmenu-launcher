@@ -63,8 +63,10 @@ customVersionEntry entries[] = {
 
 // This function will be called every time the version menu opens
 void versionInfoInitHandler() {
+#ifndef HOSD
   // Execute the original init function
   versionInfoInit();
+#endif
 
   // Extend the string table used by the version menu drawing function.
   // It picks up the entries automatically and stops once it gets a NULL pointer (0)
@@ -77,8 +79,7 @@ void versionInfoInitHandler() {
   //  as a comma-separated list of strings (e.g. 'Disc Speed,Standard,Fast\nTexture Mapping,Standard,Smooth\n').
   //  Used to build the menu, but not used to draw it.
   // 2. ROMs >=2.00 — some unknown value that doesn't seem to be used by the menu functions as modifying it doesn't seem to change anything
-  //
-  // Can be 0 if entry doesn't have a submenu.
+  // 3. HDD-OSD — points to some sort of submenu index, 00 is Diagnosis submenu
 
   // Find the first empty entry or an entry with the name located in the patcher address space (<0x100000)
   uint32_t ptr = verinfoStringTableAddr;
@@ -106,9 +107,18 @@ void versionInfoInitHandler() {
 
     _sw((uint32_t)entries[i].name, ptr);
     _sw((uint32_t)value, ptr + 4);
-    _sw(0, ptr + 8);
+#ifndef HOSD
+    _sw(0x00, ptr + 8);
+#else
+    _sw(0xff, ptr + 8); // Set to fixed index to avoid entries showing up as "Diagnosis" in HDD-OSD
+#endif
     ptr += 12;
   }
+
+#ifdef HOSD
+  // Execute the original init function
+  versionInfoInit();
+#endif
 };
 
 // Formats single-byte number into M.mm string.
@@ -128,8 +138,10 @@ void patchVersionInfo(uint8_t *osd) {
   if (!ptr)
     return;
 
+#ifndef HOSD
   // First pattern word is nop, advance ptr to point to the function call
   ptr += 4;
+#endif
 
   // Get the original function call and save the address
   uint32_t tmp = _lw((uint32_t)ptr);
@@ -137,6 +149,7 @@ void patchVersionInfo(uint8_t *osd) {
   tmp <<= 2;
   versionInfoInit = (void *)tmp;
 
+#ifndef HOSD
   // Find the string table address in versionInfoInit
   // Even if it's the same in all ROM versions >=1.20, this acts as a basic sanity check
   // to make sure the patch is replacing the actual versionInfoInit
@@ -154,6 +167,10 @@ void patchVersionInfo(uint8_t *osd) {
     verinfoStringTableAddr = tmp;
   else
     return;
+#else
+  // Using fixed offset for HDD-OSD to avoid unneeded tracing
+  verinfoStringTableAddr = hddosdVerinfoStringTableAddr;
+#endif
 
   // Replace versionInfoInit with the custom function
   tmp = 0x0c000000;
@@ -371,8 +388,9 @@ void restoreGSVideoMode() {
   SetSyscall(0x2, origSetGsCrt);
 }
 
+#ifndef HOSD
 //
-// Browser application launch patch
+// OSDMenu browser application launch patch
 // Swaps file properties and Copy/Delete menus around and launches an app when pressing Enter
 // if a title.cfg file is present in the save file directory
 //
@@ -693,3 +711,162 @@ void patchGSVideoModeProtokernel(uint8_t *osd, GSVideoMode outputMode) {
   default:
   }
 }
+#else
+//
+// HOSDMenu browser application launch patch
+// Adds the "Enter" option for ELF files or SAS-compliant applications
+//
+// 1. Inject custom code into the function that generates icon data
+//    This code checks the directory name and sets "application" flag (0x40) if it contains _ at index 3, equals BOOT or ends with .ELF/.elf
+// 2. Inject custom code into the function that sets up data for exiting to main menu
+//    This code checks the icon data and writes the ELF path into pathBuf if all conditions are met
+// 3. Inject custom code into the function that exits to main menu
+//    This code calls launchItem instead of the original function if pathBuf is not empty
+//
+// Browser entry icon offsets:
+//  0x90  - icon flags
+//  0x134 - pointer to parent device data
+//  0x1C0 - dir/file name
+// Browser device data offsets:
+//  0x124 - device number (2 - mc0, 6 - mc1, >10 = directories on HDD)
+//  0x12C - device name or directory name in __common
+
+// Path buffer
+char pathBuf[100];
+// Original functions
+void (*buildIconData)(uint8_t *iconDataLocation, uint8_t *deviceDataLocation) = NULL;
+void (*exitToPreviousModule)() = NULL;
+void (*setupExitToPreviousModule)(int appType) = NULL;
+
+void buildIconDataCustom(uint8_t *iconDataLocation, uint8_t *deviceDataLocation) {
+  // Call the original function
+  buildIconData(iconDataLocation, deviceDataLocation);
+
+  // Get directory path
+  char *dirPath = (char *)(iconDataLocation + 0x1c0);
+  if (!dirPath)
+    return;
+
+  // Set executable flag if directory name has _ at index 3, equals BOOT or if file name ends with .elf/.ELF
+  char *ext = strrchr(dirPath, '.');
+  if (!ext && ((dirPath[4] == '_') || !strcmp(dirPath, "/BOOT")))
+    *(iconDataLocation + 0x90) |= 0x40;
+  else {
+    if (ext && (!strcmp(ext, ".elf") || !strcmp(ext, ".ELF")))
+      *(iconDataLocation + 0x90) |= 0x40;
+  }
+}
+
+void exitToPreviousModuleCustom() {
+  if (pathBuf[0] != '\0')
+    launchItem(pathBuf);
+
+  exitToPreviousModule();
+}
+
+void setupExitToPreviousModuleCustom(int appType) {
+  uint32_t iconPropertiesPtr = 0;
+  uint32_t deviceDataPtr = 0;
+  // Get the pointer to currently selected item from $s2
+  asm volatile("move %0, $s2\n\t" : "=r"(iconPropertiesPtr)::);
+
+  char *targetName = NULL;
+  if (iconPropertiesPtr) {
+    // Get the pointer to device properties starting at offset 0x134
+    deviceDataPtr = _lw(iconPropertiesPtr + 0x134);
+    // Find the path in icon properties starting from offset 0x160
+    targetName = (char *)iconPropertiesPtr + 0x1c0;
+  }
+
+  if (appType || !deviceDataPtr || !targetName)
+    goto out;
+
+  pathBuf[0] = '\0';
+
+  // Get the device number and build the path
+  uint32_t devNumber = _lw(deviceDataPtr + 0x124);
+  switch (devNumber) {
+  case 6:
+    // mc1
+    devNumber -= 3;
+  case 2:
+    // mc0
+    devNumber -= 2;
+    pathBuf[0] = '\0';
+    strcat(pathBuf, "mc?:");
+    pathBuf[2] = devNumber + '0';
+    strcat(pathBuf, targetName);
+    break;
+  default:
+    if (devNumber < 11)
+      goto out;
+
+    // Assume the target is one of directories in hdd0:__common
+    char *commonDirName = (char *)deviceDataPtr + 0x12c;
+    if (!commonDirName)
+      goto out;
+
+    strcat(pathBuf, "hdd0:__common:pfs:");
+    strcat(pathBuf, commonDirName);
+    if (targetName[0] != '/')
+      strcat(pathBuf, "/");
+
+    strcat(pathBuf, targetName);
+    break;
+  }
+
+  // Append title.cfg for SAS applications
+  targetName = strrchr(targetName, '.');
+  if (!targetName || (strcmp(targetName, ".ELF") && strcmp(targetName, ".elf")))
+    strcat(pathBuf, "/title.cfg");
+
+out:
+  setupExitToPreviousModule(appType);
+  return;
+}
+
+// Browser application launch patch
+void patchBrowserApplicationLaunch(uint8_t *osd) {
+  // Find buildIconData address
+  uint8_t *ptr1 =
+      findPatternWithMask(osd, 0x100000, (uint8_t *)patternBuildIconData, (uint8_t *)patternBuildIconData_mask, sizeof(patternBuildIconData));
+  if (!ptr1)
+    return;
+
+  // Find exitToPreviousModule address
+  uint8_t *ptr2 = findPatternWithMask(osd, 0x100000, (uint8_t *)patternExitToPreviousModule, (uint8_t *)patternExitToPreviousModule_mask,
+                                      sizeof(patternExitToPreviousModule));
+  if (!ptr2)
+    return;
+
+  // Find setupExitToPreviousModule address
+  uint8_t *ptr3 = findPatternWithMask(osd, 0x100000, (uint8_t *)patternSetupExitToPreviousModule, (uint8_t *)patternSetupExitToPreviousModule_mask,
+                                      sizeof(patternSetupExitToPreviousModule));
+  if (!ptr3)
+    return;
+
+  ptr1 += 0x4;
+  buildIconData = (void *)((_lw((uint32_t)ptr1) & 0x03ffffff) << 2);
+  _sw((0x0c000000 | ((uint32_t)buildIconDataCustom >> 2)), (uint32_t)ptr1); // jal browserDirSubmenuInitViewCustom
+
+  ptr2 += 0xc;
+  exitToPreviousModule = (void *)((_lw((uint32_t)ptr2) & 0x03ffffff) << 2);
+  _sw((0x0c000000 | ((uint32_t)exitToPreviousModuleCustom >> 2)), (uint32_t)ptr2); // jal exitToPreviousModuleCustom
+
+  setupExitToPreviousModule = (void *)((_lw((uint32_t)ptr3) & 0x03ffffff) << 2);
+  _sw((0x0c000000 | ((uint32_t)setupExitToPreviousModuleCustom >> 2)), (uint32_t)ptr3); // jal setupExitToPreviousModuleCustom
+}
+
+// Homebrew atad driver with LBA48 support
+extern unsigned char legacy_ps2atad_irx[] __attribute__((aligned(16)));
+extern uint32_t size_legacy_ps2atad_irx;
+
+// Patches newer 48-bit capable atad driver into HDD-OSD
+void patchATAD() {
+  // Check for ELF magic at offset 0x0058cd80 and replace the atad driver
+  if (_lw(0x0058cd80) == 0x464c457f) {
+    memset((void *)0x0058cd80, 0x0, 0x0058fbfd - 0x0058cd80);
+    memcpy((void *)0x0058cd80, legacy_ps2atad_irx, size_legacy_ps2atad_irx);
+  }
+}
+#endif

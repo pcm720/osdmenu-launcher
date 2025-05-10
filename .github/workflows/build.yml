@@ -27,7 +27,8 @@ jobs:
       with:
         name: artifacts
         path: |
-          patcher.elf
+          osdmenu.elf
+          hosdmenu.elf
           launcher.elf
           README.md
 

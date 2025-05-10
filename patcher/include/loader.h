@@ -3,6 +3,7 @@
 
 // Uses the launcher to execute selected item
 void launchItem(char *item);
+
 // Uses the launcher to run the disc
 void launchDisc();
 

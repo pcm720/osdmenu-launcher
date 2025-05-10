@@ -1,13 +1,28 @@
 # OSDMenu
 
-Free McBoot 1.8 OSDSYS patches ported to modern PS2SDK with some useful additions.  
+Patches for OSDSYS and HDD OSD (Browser 2.0) based on Free McBoot 1.8.  
 
 ## Usage
 
-1. Copy `patcher.elf` and `launcher.elf` to `mc?:/BOOT/`  
+### OSDMenu
+1. Copy `osdmenu.elf` and `launcher.elf` to `mc?:/BOOT/`  
    Copy DKWDRV to `mc?:/BOOT/DKWDRV.ELF` _(optional)_ 
 2. Edit `mc?:/SYS-CONF/OSDMENU.CNF` [as you see fit](#osdmenucnf)
-3. Configure PS2BBL to launch `mc?:/BOOT/patcher.elf` or launch it manually from LaunchELF
+3. Configure PS2BBL to launch `mc?:/BOOT/osdmenu.elf` or launch it manually from anywhere
+
+### HOSDMenu — OSDMenu for HDD OSD
+1. Install HDD OSD 1.10U  
+   Make sure HDD OSD binaries are installed into `hdd0:__system/osd100/` and `OSDSYS_A.XLF` is present.  
+   SHA-256 hashes of `OSDSYS_A.XLF` known to work:
+   - `acc905233f79678b9d7c1de99b0aee2409136197d13e7d78bf8978cd85b736ae` — original binary from the HDD Utility Disc Version 1.10
+   - `65360a6c210b36def924770f23d5565382b5fa4519ef0bb8ddf5c556531eec14` — cracked HDD OSD with 48-bit LBA support from the Sony Utility Disc Compilation 4 disc
+
+   When using the unmodified binary on non-NTSC-U consoles, you will have to decrypt and re-encrypt the original binary with [`kelftool`](https://github.com/ps2homebrew/kelftool)
+   to change the MagicGate region to 0xff (region free).
+2. Copy `hosdmenu.elf` and `launcher.elf` to `hdd0:__system/osdmenu/`  
+   Copy DKWDRV to `hdd0:__system/osdmenu/DKWDRV.ELF` _(optional)_ 
+3. Edit `hdd0:__sysconf/OSDMENU/OSDMENU.CNF` [as you see fit](#osdmenucnf)
+4. Configure your bootloader to launch `hdd0:__system/osdmenu/hosdmenu.elf` or launch it manually from anywhere
 
 ## Key differences from FMCB 1.8:
 - All initialization code is removed in favor of using a separate bootloader to start the patcher (e.g. [PS2BBL](https://github.com/israpps/PlayStation2-Basic-BootLoader))
@@ -21,14 +36,15 @@ Free McBoot 1.8 OSDSYS patches ported to modern PS2SDK with some useful addition
 - Support for 1080i and 480p (as line-doubled 240p) video modes
 - Support for "protokernel" systems (SCPH-10000, SCPH-15000) ported from Free McBoot 1.9 by reverse-engineering
 - Support for launching applications from the memory card browser
+- Support for HDD OSD 1.10U
 
 Due to memory limitations and the need to support more devices, the original FMCB launcher was split into two parts: patcher and launcher.
 
 ## Patcher
 
-This is a slimmed-down and refactored version of OSDSYS patches from FMCB 1.8 for modern PS2SDK with some new patches sprinkled in.  
-It reads settings from `mc?:/SYS-CONF/OSDMENU.CNF` and patches the `rom0:OSDSYS` binary with the following patches:
-- Custom OSDSYS menu with up to 255 entries
+This is a slimmed-down and refactored version of OSDSYS patches from FMCB 1.8 for modern PS2SDK with some new patches sprinkled in.
+It patches the OSDSYS/HDD OSD binary and applies the following patches:
+- Custom OSDSYS menu with up to 250 entries
 - Infinite scrolling
 - Custom button prompts and menu header
 - Automatic disc launch bypass
@@ -36,16 +52,28 @@ It reads settings from `mc?:/SYS-CONF/OSDMENU.CNF` and patches the `rom0:OSDSYS`
   Due to how to OSDSYS renders everything, "true" 480p can't be implemented easily
 - HDD update check bypass
 - Override PS1 and PS2 disc launch functions with custom code that starts the launcher
-- Additional system information in version submenu (Video mode, ROM version, EE, GS and MechaCon revision)
+- Additional system information in version submenu (Video mode, ROM version, EE, GS and MechaCon revision)  
+**OSDMenu**:
 - Launch SAS-compatible applications from the memory card browser if `title.cfg` exists in the directory (see [config handler](#config-handler))  
   This patch swaps around the "Enter" and "Options" menus and substitutes file properties submenu with the launcher.  
   To launch an app, just press "Enter" after selecting the app icon.  
-  To copy or delete the save file, just use the triangle button.
+  To copy or delete the save file, just use the triangle button.  
+**HOSDMenu**:
+- Launch SAS-compatible applications and ELF files from directories in the `hdd0:__common` partition or the memory card browser
+  if directory name is `BOOT`, `<3-letter SAS prefix>_<appname>` or if file name ends with `.ELF` or `.elf`.  
+  To launch an app, just press "Enter" after selecting the app icon.
+- ATAD driver is replaced to bypass security checks on unmodified HDD OSD or to fix compatibility with drives larger than 1TB on cracked HDD OSD.  
+    
+  Note that HDD OSD will not see more than 1048448 MB. For larger drives, [APA Jail](https://www.psx-place.com/threads/apa-jail.34847/) is recommended.  
+  You can also check out [PSBBN Definitive English Patch](https://github.com/CosmicScale/PSBBN-Definitive-English-Patch) for more automated APA Jail experience and easy-to-use HDD OSD+Broadband Navigator setup.
 
 Patches not supported/limited on protokernel systems:
 - Automatic disc launch bypass
 - Button prompt customization
 - PAL video mode
+
+**OSDMenu** version of the patcher reads settings from `mc?:/SYS-CONF/OSDMENU.CNF` and patches the `rom0:OSDSYS` binary.  
+**HOSDMenu** version reads settings from `hdd0:__sysconf/OSDMENU/OSDMENU.CNF` and patches the `hdd0:__system/osd100/hosdsys.elf`
 
 ### Configuration
 
@@ -82,7 +110,7 @@ Supports the following arguments:
 - `-nologo` — launches the game executable directly, bypassing `rom0:PS2LOGO`
 - `-nogameid` — disables visual game ID
 - `-dkwdrv` — when PS1 disc is detected, launches DKWDRV from `mc?:/BOOT/DKWDRV.ELF` instead of `rom0:PS1DRV`
-- `-dkwdrv=mc?:/<path to DKWDRV>` — same as `-dkwdrv`, but with custom DKWDRV path.
+- `-dkwdrv=<path to DKWDRV>` — same as `-dkwdrv`, but with custom DKWDRV path.
 
 For PS1 CDs with generic executable name (e.g. `PSX.EXE`), attempts to guess the game ID using the volume creation date
 stored in the Primary Volume Descriptor, based on the table from [TonyHax International](https://github.com/alex-free/tonyhax/blob/master/loader/gameid-psx-exe.c).
@@ -161,13 +189,17 @@ New to this launcher:
 25. `cdrom_skip_ps2logo` — enables or disables running discs via `rom0:PS2LOGO`. Useful for MechaPwn-patched consoles.
 26. `cdrom_disable_gameid` — disables or enables visual Game ID
 27. `cdrom_use_dkwdrv` — enables or disables launching DKWDRV for PS1 discs
-28. `path_LAUNCHER_ELF` — custom path to launcher.elf. The path MUST be on the memory card
-29. `path_DKWDRV_ELF` — custom path to DKWDRV.ELF. The path MUST be on the memory card
-30. `OSDSYS_Browser_Launcher` — enables/disables patch for launching applications from the Browser 
+28. `OSDSYS_Browser_Launcher` — enables/disables patch for launching applications from the Browser 
+
+Options exclusive to OSDMenu:
+
+29. `path_LAUNCHER_ELF` — custom path to launcher.elf. The path MUST be on the memory card
+30. `path_DKWDRV_ELF` — custom path to DKWDRV.ELF. The path MUST be on the memory card
 
 ## Credits
 
 - Everyone involved in developing the original Free MC Boot and OSDSYS patches, especially Neme and jimmikaelkael
+- Julian Uy for mapping out significant parts of HDD OSD for [osdsys_re](https://github.com/ps2re/osdsys_re) project
 - [TonyHax International](https://github.com/alex-free/tonyhax) developers for PS1 game ID detection for generic executables.
 - Maximus32 for creating the [`smap_udpbd` module](
 https://github.com/rickgaiser/neutrino) and Neutrino GSM

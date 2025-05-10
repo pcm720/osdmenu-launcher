@@ -1,16 +1,26 @@
 .PHONY: all clean
 
-all: patcher.elf launcher.elf
+all: osdmenu hosdmenu launcher
+osdmenu: osdmenu.elf
+hosdmenu: hosdmenu.elf
+launcher: launcher.elf
 
 clean:
-	rm patcher.elf launcher.elf
+	rm osdmenu.elf hosdmenu.elf launcher.elf
 	$(MAKE) -C patcher clean
 	$(MAKE) -C launcher clean
 
 # OSDSYS Patcher
-patcher.elf:
+osdmenu.elf:
+	$(MAKE) -C patcher clean
 	$(MAKE) -C patcher/$<
-	cp patcher/patcher.elf patcher.elf
+	cp patcher/patcher.elf osdmenu.elf
+
+# HDD OSD Patcher
+hosdmenu.elf:
+	$(MAKE) -C patcher clean
+	$(MAKE) -C patcher/$< HOSD=1
+	cp patcher/patcher.elf hosdmenu.elf
 
 # Launcher
 launcher.elf:

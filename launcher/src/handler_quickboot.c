@@ -7,6 +7,10 @@
 #include <string.h>
 
 int handleQuickboot(char *cnfPath) {
+  int isHDD = 0;
+  if (!strncmp(cnfPath, "hdd", 3))
+    isHDD = 1;
+
   int res;
   char *ext = strrchr(cnfPath, '.');
   if (!ext)
@@ -20,23 +24,41 @@ int handleQuickboot(char *cnfPath) {
     ext[4] = '\0';
   }
 
-  DeviceType dtype = guessDeviceType(cnfPath);
-  if (dtype == Device_None)
-    return -ENODEV;
+  DeviceType dtype;
+  if (isHDD) {
+    dtype = Device_PFS;
+    if ((res = initPFS(cnfPath)))
+      return res;
+  } else {
+    dtype = guessDeviceType(cnfPath);
+    if (dtype == Device_None)
+      return -ENODEV;
 
-  // Always reset IOP to a known state
-  if ((res = initModules(dtype)))
-    return res;
+    // Always reset IOP to a known state
+    if ((res = initModules(dtype)))
+      return res;
+  }
 
   // Open the config file
+  char *launchTarget = cnfPath;
   cnfPath = normalizePath(cnfPath, dtype);
-  if (!cnfPath)
+  if (!cnfPath) {
+    if (isHDD)
+      deinitPFS();
     return -ENOENT;
+  }
 
+  DPRINTF("Opening %s\n", cnfPath);
   FILE *file = fopen(cnfPath, "r");
-  if (!file) {
-    msg("Quickboot: Failed to open %s\n", cnfPath);
-    return -ENODEV;
+  int delayAttempts = DELAY_ATTEMPTS; // Max number of attempts
+  while (!file) {
+    sleep(1);
+    delayAttempts--;
+    if (delayAttempts < 0) {
+      msg("Quickboot: Failed to open %s\n", cnfPath);
+      return -ENODEV;
+    }
+    file = fopen(cnfPath, "r");
   }
 
   // Temporary path and argument lists
@@ -48,8 +70,7 @@ int handleQuickboot(char *cnfPath) {
   char relpathBuffer[PATH_MAX] = {0};
   char *valuePtr = NULL;
 
-  // Reuse cnfPath for the current working directory
-  ext = strrchr(cnfPath, '/');
+  ext = strrchr(launchTarget, '/');
   if (ext)
     *ext = '\0';
 
@@ -69,7 +90,7 @@ int handleQuickboot(char *cnfPath) {
     if (!strncmp(lineBuffer, "boot", 4) && ext) {
       if (strlen(valuePtr) > 0) {
         // Assemble full path
-        snprintf(relpathBuffer, PATH_MAX - 1, "%s/%s", cnfPath, valuePtr);
+        snprintf(relpathBuffer, PATH_MAX - 1, "%s/%s", launchTarget, valuePtr);
         targetPaths = addStr(targetPaths, relpathBuffer);
       }
       continue;
@@ -88,6 +109,8 @@ int handleQuickboot(char *cnfPath) {
     }
   }
   fclose(file);
+  if (isHDD)
+    deinitPFS();
 
   // Build argv, freeing targetArgs
   char **targetArgv = malloc(targetArgc * sizeof(char *));
@@ -107,6 +130,7 @@ int handleQuickboot(char *cnfPath) {
   tlstr = targetPaths;
   while (tlstr) {
     targetArgv[0] = tlstr->str;
+    DPRINTF("Attempting to launch %s\n", tlstr->str);
     // If target path is valid, it'll never return from launchPath
     launchPath(targetArgc, targetArgv);
     free(tlstr->str);

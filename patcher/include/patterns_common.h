@@ -16,21 +16,8 @@ static uint32_t patternExecPS2[] = {
 static uint32_t patternExecPS2_mask[] = {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff};
 
 //
-// The following patterns are introduced in FMCB 1.9 and found by reverse-engineering FMCB 1.9 code
+// The following two patterns are introduced in FMCB 1.9 and found by reverse-engineering FMCB 1.9 code
 //
-
-// Used to inject the patching function into the OSDSYS init on protokernels
-// Inject j <applyPatches> at offset +0x3c
-static uint32_t patternOSDSYSProtokernelInit[] = {
-    0x26940414, // addiu s4,s4,0x0414
-    0x26d60414, // addiu s6,s6,0x0414
-    0x2aa2000c, // slti  v0,s5,0x000C
-    0x14400000, // bne   v0,zero,0x????
-    0x26520414, // addiu s2,s2,0x0414
-};
-static uint32_t patternOSDSYSProtokernelInit_mask[] = {
-    0xffffffff, 0xffffffff, 0xffffffff, 0xffff0000, 0xffffffff,
-};
 
 // Used to deinit OSDSYS
 static uint32_t patternOSDSYSDeinit[] = {
@@ -46,5 +33,42 @@ static uint32_t patternOSDSYSDeinit[] = {
 static uint32_t patternOSDSYSDeinit_mask[] = {
     0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0xfc000000, 0xffffffff, 0xfc000000, 0xffffffff,
 };
+
+#ifndef HOSD
+// Used to inject the patching function into the OSDSYS init on protokernels
+// Inject j <applyPatches> at offset +0x3c
+static uint32_t patternOSDSYSProtokernelInit[] = {
+    0x26940414, // addiu s4,s4,0x0414
+    0x26d60414, // addiu s6,s6,0x0414
+    0x2aa2000c, // slti  v0,s5,0x000C
+    0x14400000, // bne   v0,zero,0x????
+    0x26520414, // addiu s2,s2,0x0414
+};
+static uint32_t patternOSDSYSProtokernelInit_mask[] = {
+    0xffffffff, 0xffffffff, 0xffffffff, 0xffff0000, 0xffffffff,
+};
+#else
+//
+// HDD-OSD patterns
+//
+
+static uint32_t patternSCERemove[] = {
+    0x27bdfff0, // addiu sp,sp,0xFFF0
+    0xffbf0000, // sd    ra,0x0000,sp
+    0x0c000000, // jal   _sceCallCode
+    0x24050006, // addiu a1,zero,0x6
+    0xdfbf0000, // ld    ra,0x0000,sp
+};
+static uint32_t patternSCERemove_mask[] = {0xffffffff, 0xffffffff, 0xfc000000, 0xffffffff, 0xffffffff};
+
+static uint32_t patternSCEUmount[] = {
+    0x27bdfff0, // addiu sp,sp,0xFFF0
+    0xffbf0000, // sd    ra,0x0000,sp
+    0x0c000000, // jal   _sceCallCode
+    0x24050015, // addiu a1,zero,0x15
+    0xdfbf0000, // ld    ra,0x0000,sp
+};
+static uint32_t patternSCEUmount_mask[] = {0xffffffff, 0xffffffff, 0xfc000000, 0xffffffff, 0xffffffff};
+#endif
 
 #endif

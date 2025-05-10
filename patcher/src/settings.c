@@ -9,8 +9,12 @@
 PatcherSettings settings;
 
 // Defined in common/defaults.h
+#ifndef HOSD
 char cnfPath[] = CONF_PATH;
 char launcherPath[] = LAUNCHER_PATH;
+#else
+char cnfPath[] = "pfs0:" HOSD_CONF_PATH;
+#endif
 
 // getCNFString is the main CNF parser called for each CNF variable in a CNF file.
 // Input and output data is handled via its pointer parameters.
@@ -66,6 +70,7 @@ nextLine:
 
 // Loads config file from the memory card
 int loadConfig(void) {
+#ifndef HOSD
   if (settings.mcSlot == 1)
     cnfPath[2] = '1';
   else
@@ -84,6 +89,11 @@ int loadConfig(void) {
 
   // Change mcSlot to point to the memory card contaning the config file
   settings.mcSlot = cnfPath[2] - '0';
+#else
+  int fd = fioOpen(cnfPath, FIO_O_RDONLY);
+  if (fd < 0)
+    return -1;
+#endif
 
   size_t cnfSize = fioLseek(fd, 0, FIO_SEEK_END);
   fioLseek(fd, 0, FIO_SEEK_SET);
@@ -188,6 +198,7 @@ int loadConfig(void) {
       settings.menuItemCount++;
       continue;
     }
+#ifndef HOSD
     if (!strcmp(name, "path_LAUNCHER_ELF")) {
       if (strlen(value) < 4 || strncmp(value, "mc", 2))
         continue; // Accept only memory card paths
@@ -202,6 +213,7 @@ int loadConfig(void) {
       strncpy(settings.dkwdrvPath, value, (sizeof(settings.dkwdrvPath) / sizeof(char)) - 1);
       continue;
     }
+#endif
     if (!strcmp(name, "OSDSYS_video_mode")) {
       if (!strcmp(value, "AUTO"))
         settings.videoMode = 0;
@@ -329,8 +341,11 @@ void initConfig(void) {
     settings.menuItemIdx[i] = 0;
   }
   settings.menuItemCount = 0;
+  settings.romver[0] = '\0';
+#ifndef HOSD
   strcpy(settings.launcherPath, launcherPath);
   settings.dkwdrvPath[0] = '\0'; // Can be null
-  settings.romver[0] = '\0';
+#endif
+
   initVariables();
 }
