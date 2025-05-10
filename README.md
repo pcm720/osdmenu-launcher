@@ -1,6 +1,6 @@
 # OSDMenu
 
-Patches for OSDSYS and HDD OSD based on Free McBoot 1.8.  
+Patches for OSDSYS and HDD OSD (Browser 2.0) based on Free McBoot 1.8.  
 
 ## Usage
 
@@ -11,10 +11,14 @@ Patches for OSDSYS and HDD OSD based on Free McBoot 1.8.
 3. Configure PS2BBL to launch `mc?:/BOOT/osdmenu.elf` or launch it manually from anywhere
 
 ### HOSDMenu — OSDMenu for HDD OSD
-1. Install the cracked HDD OSD 1.10U with 48-bit LBA support  
-   Make sure HDD OSD binaries are installed into `hdd0:__system/osd100/` and `OSDSYS_A.XLF` is renamed to `hosdsys.elf`  
-   SHA-256 hashes of `hosdsys.elf` known to work:
-   - `65360a6c210b36def924770f23d5565382b5fa4519ef0bb8ddf5c556531eec14`
+1. Install HDD OSD 1.10U  
+   Make sure HDD OSD binaries are installed into `hdd0:__system/osd100/` and `OSDSYS_A.XLF` is present.  
+   SHA-256 hashes of `OSDSYS_A.XLF` known to work:
+   - `acc905233f79678b9d7c1de99b0aee2409136197d13e7d78bf8978cd85b736ae` — original binary from the HDD Utility Disc Version 1.10
+   - `65360a6c210b36def924770f23d5565382b5fa4519ef0bb8ddf5c556531eec14` — cracked HDD OSD with 48-bit LBA support from the Sony Utility Disc Compilation 4 disc
+
+   When using the unmodified binary on non-NTSC-U consoles, you will have to decrypt and re-encrypt the original binary with [`kelftool`](https://github.com/ps2homebrew/kelftool)
+   to change the MagicGate region to 0xff (region free).
 2. Copy `hosdmenu.elf` and `launcher.elf` to `hdd0:__system/osdmenu/`  
    Copy DKWDRV to `hdd0:__system/osdmenu/DKWDRV.ELF` _(optional)_ 
 3. Edit `hdd0:__sysconf/OSDMENU/OSDMENU.CNF` [as you see fit](#osdmenucnf)
@@ -32,14 +36,14 @@ Patches for OSDSYS and HDD OSD based on Free McBoot 1.8.
 - Support for 1080i and 480p (as line-doubled 240p) video modes
 - Support for "protokernel" systems (SCPH-10000, SCPH-15000) ported from Free McBoot 1.9 by reverse-engineering
 - Support for launching applications from the memory card browser
-- Support for cracked HDD OSD 1.10U with 48-bit LBA support
+- Support for HDD OSD 1.10U
 
 Due to memory limitations and the need to support more devices, the original FMCB launcher was split into two parts: patcher and launcher.
 
 ## Patcher
 
 This is a slimmed-down and refactored version of OSDSYS patches from FMCB 1.8 for modern PS2SDK with some new patches sprinkled in.
-It patches the OSDSYS/HDD-OSD binary and applies the following patches:
+It patches the OSDSYS/HDD OSD binary and applies the following patches:
 - Custom OSDSYS menu with up to 250 entries
 - Infinite scrolling
 - Custom button prompts and menu header
@@ -57,7 +61,11 @@ It patches the OSDSYS/HDD-OSD binary and applies the following patches:
 **HOSDMenu**:
 - Launch SAS-compatible applications and ELF files from directories in the `hdd0:__common` partition or the memory card browser
   if directory name is `BOOT`, `<3-letter SAS prefix>_<appname>` or if file name ends with `.ELF` or `.elf`.  
-  To launch an app, just press "Enter" after selecting the app icon.  
+  To launch an app, just press "Enter" after selecting the app icon.
+- ATAD driver is replaced to bypass security checks on unmodified HDD OSD or to fix compatibility with drives larger than 1TB on cracked HDD OSD.  
+    
+  Note that HDD OSD will not see more than 1048448 MB. For larger drives, [APA Jail](https://www.psx-place.com/threads/apa-jail.34847/) is recommended.  
+  You can also check out [PSBBN Definitive English Patch](https://github.com/CosmicScale/PSBBN-Definitive-English-Patch) for more automated APA Jail experience and easy-to-use HDD OSD+Broadband Navigator setup.
 
 Patches not supported/limited on protokernel systems:
 - Automatic disc launch bypass
@@ -191,7 +199,7 @@ Options exclusive to OSDMenu:
 ## Credits
 
 - Everyone involved in developing the original Free MC Boot and OSDSYS patches, especially Neme and jimmikaelkael
-- Julian Uy for mapping out significant parts of HDD-OSD for [osdsys_re](https://github.com/ps2re/osdsys_re) project
+- Julian Uy for mapping out significant parts of HDD OSD for [osdsys_re](https://github.com/ps2re/osdsys_re) project
 - [TonyHax International](https://github.com/alex-free/tonyhax) developers for PS1 game ID detection for generic executables.
 - Maximus32 for creating the [`smap_udpbd` module](
 https://github.com/rickgaiser/neutrino) and Neutrino GSM
