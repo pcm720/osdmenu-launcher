@@ -60,13 +60,11 @@ linkedStr *addStr(linkedStr *lstr, char *str);
 // Frees all elements of linkedStr
 void freeLinkedStr(linkedStr *lstr);
 
-#ifdef APA
 // Initializes APA-formatted HDD and mounts the partition
 int initPFS(char *path);
 
 // Unmounts the partition
 void deinitPFS();
-#endif
 
 #ifdef ENABLE_PRINTF
     #define DPRINTF(x...) printf(x)

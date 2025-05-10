@@ -190,8 +190,8 @@ DeviceType guessDeviceType(char *path) {
 #ifdef CDROM
   } else if (!strncmp("cdrom", path, 5)) {
     return Device_CDROM;
-  }
 #endif
+  }
   return Device_None;
 }
 
@@ -240,9 +240,11 @@ char *normalizePath(char *path, DeviceType type) {
   return pathbuffer;
 }
 
-#ifdef APA
 // Initializes APA-formatted HDD and mounts the partition
 int initPFS(char *path) {
+#ifndef APA
+  return -ENODEV;
+#else
   int res;
   // Reset IOP
   if ((res = initModules(Device_PFS)))
@@ -279,12 +281,14 @@ int initPFS(char *path) {
     return -ENODEV;
 
   return 0;
+#endif
 }
 
 // Unmounts the partition
 void deinitPFS() {
+#ifdef APA
   fileXioDevctl(PFS_MOUNTPOINT, PDIOC_CLOSEALL, NULL, 0, NULL, 0);
   fileXioSync(PFS_MOUNTPOINT, FXIO_WAIT);
   fileXioUmount(PFS_MOUNTPOINT);
-}
 #endif
+}
